@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<title>密談室｜跑團聊天室</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- 頂部列 -->
+  <div class="topbar">
+    <h1>ALICE IS MISSING</h1>
+    <div class="room-pill" id="roomPill">尚未加入房間</div>
+  </div>
+
+  <!-- ============ 設置 TAB ============ -->
+  <div class="view active" id="view-settings">
+    <div class="settings-scroll">
+
+      <!-- 1. 連線設定 -->
+      <div class="card" id="fbCard">
+        <h2><span class="num">1</span>連線設定（每台裝置只需設定一次）</h2>
+        <details id="fbDetails">
+          <summary>展開 Firebase 連線設定</summary>
+          <p class="help-text">
+            這個聊天室要多人跨裝置同步，需要一個免費的 Firebase 即時資料庫來當「訊息中繼站」，網站本身仍是純靜態頁面，可放心部署到 GitHub Pages。
+            <ol>
+              <li>前往 <a href="https://console.firebase.google.com" target="_blank">Firebase Console</a> 建立新專案（免費）</li>
+              <li>左側選單啟用「Realtime Database」，測試模式建立</li>
+              <li>專案設定 →新增「網頁應用程式」→ 複製 firebaseConfig 物件</li>
+              <li>整段貼到下方欄位即可</li>
+            </ol>
+          </p>
+          <label>貼上 firebaseConfig（直接從 Firebase 主控台複製整段貼上即可，不用自己改格式）</label>
+          <textarea id="fbConfigInput" placeholder='const firebaseConfig = {&#10;  apiKey: "...",&#10;  authDomain: "...",&#10;  databaseURL: "https://xxx.firebasedatabase.app",&#10;  projectId: "..."&#10;};'></textarea>
+          <div class="btn-row" style="margin-top:10px;">
+            <button class="btn btn-primary" id="btnSaveFb">儲存並連線</button>
+          </div>
+          <div id="fbStatus" class="status-line status-wait">尚未連線</div>
+        </details>
+      </div>
+
+      <!-- 2. 房間 -->
+      <div class="card" id="roomCard">
+        <h2><span class="num">2</span>房間</h2>
+        <div id="roomJoinBlock">
+          <label>你的暱稱</label>
+          <input type="text" id="nicknameInput" placeholder="例如：阿凱" maxlength="10">
+          <div class="btn-row" style="margin-top:12px;">
+            <button class="btn btn-primary" id="btnCreateRoom">建立新房間</button>
+          </div>
+          <label style="margin-top:14px;">或輸入房間代碼加入</label>
+          <div class="btn-row">
+            <input type="text" id="roomCodeInput" placeholder="6碼房間代碼" maxlength="6" style="text-transform:uppercase;">
+            <button class="btn btn-outline" id="btnJoinRoom" style="width:auto; flex:0 0 auto; padding:12px 18px;">加入</button>
+          </div>
+          <div id="roomStatus" class="status-line status-wait" style="display:none;"></div>
+        </div>
+
+        <div id="roomJoinedBlock" style="display:none;">
+          <label>房間代碼（分享給隊友）</label>
+          <div class="status-line status-ok" id="roomCodeDisplay" style="font-size:16px; font-weight:800; letter-spacing:2px; justify-content:center;"></div>
+          <label style="margin-top:14px;">成員（<span id="memberCount">0</span>/5）</label>
+          <div class="member-list" id="memberList"></div>
+          <button class="btn btn-danger" id="btnLeaveRoom" style="margin-top:14px;">離開房間</button>
+        </div>
+      </div>
+
+      <!-- 3. 遊戲面板 -->
+      <div id="gamePanel" style="display:none;">
+
+        <div class="hero-title">
+          <h1>Alice Is Missing</h1>
+          <div class="sub">A SILENT ROLE PLAYING GAME</div>
+        </div>
+
+        <!-- ① 計時 -->
+        <div class="card" id="gameTimerCard">
+          <h2><span class="num">⏱</span>場次計時</h2>
+          <div class="timer-display" id="settingsTimerDisplay">90:00</div>
+          <div class="timer-sub" id="settingsTimerSub">尚未開始計時</div>
+        </div>
+
+        <!-- ② 現在階段 / 這一步該做的事 -->
+        <div class="card">
+          <div class="phase-bar">
+            <span class="phase-label" id="phaseLabel">階段：準備中</span>
+            <div class="btn-row" style="width:auto;">
+              <button class="btn btn-ghost" id="btnPhasePrev" style="width:auto; padding:8px 12px;">上一步</button>
+              <button class="phase-btn" id="btnPhaseNext">
+                下一步
+              </button>
+            </div>
+          </div>
+
+          <!-- 開場卡 S01-1，僅在 intro 階段顯示 -->
+          <div class="intro-card-wrap" id="introCardWrap" style="display:none;">
+            <img id="introCardImg" src="assets/cards/S01-1_face.jpg" alt="S01-1">
+            <div class="cap" style="margin-top:6px;">S01-1</div>
+          </div>
+
+          <!-- 這個階段該做的具體動作（指派劇情卡 / 抽卡佇列等），依階段動態產生 -->
+          <div id="phaseActionArea"></div>
+        </div>
+
+        <!-- ③ 共用區域：地點、嫌犯、線索 -->
+        <div class="shared-area" id="sharedArea" style="display:none;">
+          <h2 style="font-size:14px;margin:0 0 4px;color:var(--ink-soft);">共用線索區</h2>
+
+          <div class="shared-pool" data-pool="location">
+            <div class="pool-title">📍 地點</div>
+            <div class="pool-desc">牌堆固定顯示牌背，抽出後在旁邊以正面橫向排列</div>
+            <div class="shared-pool-main">
+              <button class="deck-pile" data-action="draw-shared" data-pool="location">
+                <img src="assets/cards/S04-4_back.jpg" alt="地點牌堆">
+                <div class="cap">抽取</div>
+              </button>
+              <div class="revealed-row" id="revealed-location"></div>
+            </div>
+          </div>
+
+          <div class="shared-pool" data-pool="suspect">
+            <div class="pool-title">🕵️ 嫌犯</div>
+            <div class="pool-desc">牌堆固定顯示牌背，抽出後在旁邊以正面橫向排列</div>
+            <div class="shared-pool-main">
+              <button class="deck-pile" data-action="draw-shared" data-pool="suspect">
+                <img src="assets/cards/S03-2_back.jpg" alt="嫌犯牌堆">
+                <div class="cap">抽取</div>
+              </button>
+              <div class="revealed-row" id="revealed-suspect"></div>
+            </div>
+          </div>
+
+          <div class="shared-pool" data-pool="clue">
+            <div class="pool-title">🔍 線索</div>
+            <div class="pool-desc">牌堆固定顯示牌背，抽出後在旁邊以正面橫向排列</div>
+            <div class="shared-pool-main">
+              <button class="deck-pile" data-action="draw-shared" data-pool="clue">
+                <img src="assets/cards/S04-4_back.jpg" alt="線索牌堆">
+                <div class="cap">抽取</div>
+              </button>
+              <div class="revealed-row" id="revealed-clue"></div>
+            </div>
+          </div>
+
+          <div class="conclusion-box">
+            <div class="ctitle">案件結論</div>
+            <div class="conclusion-row">
+              <div class="conclusion-item">
+                <div class="clabel">真兇</div>
+                <div id="finalSuspectSlot"><div class="empty-mark">尚未選定</div></div>
+              </div>
+              <div class="conclusion-item">
+                <div class="clabel">位置</div>
+                <div id="finalLocationSlot"><div class="empty-mark">尚未選定</div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="shared-pool" style="margin-top:16px;">
+            <div class="pool-title">🎲 最終抉擇（S12-4～S12-6）</div>
+            <div class="pool-desc">剩餘 10 分鐘時抽取。若抽到 S12-5 或 S12-6，系統會自動擲硬幣並直接顯示結果文字。</div>
+            <div class="shared-pool-main">
+              <button class="deck-pile" id="btnDrawFinal" data-action="draw-final">
+                <img src="assets/cards/S12-4_back.jpg" alt="最終抉擇">
+                <div class="cap">抽取</div>
+              </button>
+              <div id="finalDrawResult" style="flex:1;"></div>
+            </div>
+          </div>
+
+          <div class="finale-wrap" id="finaleWrap" style="display:none;">
+            <div class="cap" style="margin-bottom:6px;">錄音已播畢：</div>
+            <img id="finaleCardImg" src="assets/cards/S01-2_face.jpg" alt="S01-2">
+          </div>
+          <button class="btn btn-primary" id="btnExportFinal" style="margin-top:10px; display:none;">⬇ 匯出所有場內對話紀錄</button>
+        </div>
+
+        <!-- ④ 每位玩家自己的紀錄：角色、動機、角色紀錄表 -->
+        <div id="playerBlocks"></div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============ 訊息 TAB ============ -->
+  <div class="view" id="view-messages">
+    <div class="gate" id="msgGate">
+      <div class="icon">💬</div>
+      <div>請先到「設置」頁籤建立或加入房間，<br>才能開始聊天。</div>
+    </div>
+
+    <div id="msgContent" style="display:none; flex:1; min-height:0; display:none; flex-direction:column; position:relative;">
+      <div class="chat-header">
+        <button class="hamburger-btn" id="btnChannelMenu" title="切換頻道">☰</button>
+        <div class="current-channel-label" id="currentChannelName">群組</div>
+        <div class="util-icons">
+          <button class="icon-btn ooc-btn" id="btnOoc" title="場外討論">🗯 場外</button>
+        </div>
+      </div>
+      <div class="timer-bar" id="timerBar">
+        <span class="timer-mini">⏱ <span class="t" id="chatTimerDisplay">90:00</span></span>
+      </div>
+
+      <div class="messages-scroll" id="messagesScroll">
+        <div class="empty-state">還沒有訊息，說點什麼吧！</div>
+      </div>
+
+      <div class="input-bar">
+        <textarea id="msgInput" rows="1" placeholder="輸入訊息…"></textarea>
+        <button class="send-btn" id="btnSend">➤</button>
+      </div>
+
+      <!-- 左側頻道抽屜選單（Discord 風格） -->
+      <div class="drawer-overlay" id="drawerBackdrop"></div>
+      <div class="channel-drawer" id="channelDrawer">
+        <div class="channel-drawer-head">頻道</div>
+        <div class="channel-drawer-list" id="channelDrawerList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 紀錄 TAB（角色紀錄，僅自己看得到） ============ -->
+  <div class="view" id="view-charlog">
+    <div class="gate" id="charlogGate">
+      <div class="icon">📝</div>
+      <div>請先到「設置」頁籤建立或加入房間，<br>才能填寫角色紀錄。</div>
+    </div>
+    <div id="charlogContent" style="display:none; flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;">
+      <div class="settings-scroll">
+        <div class="card">
+          <h2 style="margin-bottom:2px;">📝 角色紀錄</h2>
+          <p class="help-text" style="margin-top:0;">這份紀錄只存在你自己的裝置上，其他玩家看不到，隨時都可以回來編輯。</p>
+          <div id="charlogMount"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 底部 TAB BAR ============ -->
+  <div class="tabbar">
+    <button class="tabbtn active" data-tab="settings">
+      <span class="icon">⚙️</span><span>設置</span>
+    </button>
+    <button class="tabbtn" data-tab="messages">
+      <span class="icon">💬</span><span>訊息</span>
+    </button>
+    <button class="tabbtn" data-tab="charlog">
+      <span class="icon">📝</span><span>紀錄</span>
+    </button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
