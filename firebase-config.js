@@ -20,13 +20,4 @@
   如果暫時留著 null，網站會自動退回「每個人自己貼設定」的模式（跟之前一樣），
   方便你自己先測試用。
 */
-window.FIREBASE_CONFIG = {
-  apiKey: "AIzaSyBspuH0hLXQBH8FNDA1M20CnJgUxSm1YNk",
-  authDomain: "alice-is-missing-7183a.firebaseapp.com",
-  databaseURL: "https://alice-is-missing-7183a-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "alice-is-missing-7183a",
-  storageBucket: "alice-is-missing-7183a.firebasestorage.app",
-  messagingSenderId: "1080641088440",
-  appId: "1:1080641088440:web:4dac47ac4c5ed7f331bd4d",
-  measurementId: "G-TWD726VWTX"
-};
+window.FIREBASE_CONFIG = null;
