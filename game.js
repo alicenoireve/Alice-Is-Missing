@@ -89,6 +89,11 @@ const PEOPLE_LIST = [
 let gameRef = null;
 let game = null; // 目前 room 的 game 節點快照
 let locallyRevealed = { suspect:false, location:false }; // 本機「已點擊查看」狀態，不同步
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordingStream = null;
+let recordingActive = false;
+let lastPlaybackTriggerTs = null;
 
 function $$(sel, root){ return (root||document).querySelector(sel); }
 
@@ -102,7 +107,7 @@ function onRoomEnter(){
         roleAssign:{}, motiveAssign:{}, timerSlotAssign:{}, timerSlotDraw:{},
         sharedPools:{ location:{revealed:{}, finalCode:null, finalSetBy:null}, suspect:{revealed:{}, finalCode:null, finalSetBy:null}, clue:{revealed:{}} },
         finalDraw:{ code:null, coin:null, text:null },
-        recordingConfirmed:{}, playbackIndex:0,
+        recordingConfirmed:{}, recordings:{}, playbackIndex:0, playbackTrigger:null,
         usedCards:{}, finaleRevealed:false
       });
     }
@@ -127,12 +132,90 @@ function emptyGame(){
     phase:"intro", roleAssign:{}, motiveAssign:{}, timerSlotAssign:{}, timerSlotDraw:{},
     sharedPools:{ location:{revealed:{},finalCode:null,finalSetBy:null}, suspect:{revealed:{},finalCode:null,finalSetBy:null}, clue:{revealed:{}} },
     finalDraw:{ code:null, coin:null, text:null },
-    recordingConfirmed:{}, playbackIndex:0,
+    recordingConfirmed:{}, recordings:{}, playbackIndex:0, playbackTrigger:null,
     usedCards:{}, finaleRevealed:false
   };
 }
 
 function update(patch){ if(gameRef) gameRef.update(patch); }
+
+/* ---------- 播放順序：固定依查理→達珂塔→傑克→茱莉安→埃文，只算有人選的角色 ---------- */
+function getPlaybackOrder(){
+  return ROLE_CODES
+    .map(code => (game.roleAssign||{})[code])
+    .filter(mid => !!mid);
+}
+
+/* ---------- 錄音（MediaRecorder，僅存最後一次結果） ---------- */
+function startRecording(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    toast("這個瀏覽器不支援錄音功能");
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio:true }).then(stream=>{
+    recordingStream = stream;
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e=>{ if(e.data.size>0) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = ()=>{
+      const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+      const reader = new FileReader();
+      reader.onloadend = ()=>{
+        const patch = {};
+        patch[`recordings/${state.memberId}`] = reader.result;
+        patch[`recordingConfirmed/${state.memberId}`] = true;
+        update(patch);
+        toast("錄音已儲存（只保留這一次的結果）");
+        renderPhaseAction();
+      };
+      reader.readAsDataURL(blob);
+      recordingStream.getTracks().forEach(t=>t.stop());
+      recordingStream = null;
+    };
+    mediaRecorder.start();
+    recordingActive = true;
+    renderPhaseAction();
+    setTimeout(()=>{
+      if(mediaRecorder && mediaRecorder.state !== "inactive"){
+        toast("已達錄音時間上限（3分鐘），自動停止");
+        stopRecording();
+      }
+    }, 3*60*1000);
+  }).catch(err=>{
+    toast("無法取得麥克風權限："+err.message);
+  });
+}
+function stopRecording(){
+  if(mediaRecorder && mediaRecorder.state !== "inactive"){
+    mediaRecorder.stop();
+  }
+  recordingActive = false;
+}
+
+/* ---------- 播放同步：任何人點播放，所有連線中的裝置都會各自播放同一段錄音 ---------- */
+function ensurePlaybackAudioEl(){
+  let el = document.getElementById("playbackAudioEl");
+  if(!el){
+    el = document.createElement("audio");
+    el.id = "playbackAudioEl";
+    el.style.display = "none";
+    document.body.appendChild(el);
+  }
+  return el;
+}
+function checkPlaybackTrigger(){
+  const trig = game.playbackTrigger;
+  if(!trig || trig.ts === lastPlaybackTriggerTs) return;
+  lastPlaybackTriggerTs = trig.ts;
+  const order = getPlaybackOrder();
+  const mid = order[trig.index];
+  const audioData = (game.recordings||{})[mid];
+  const el = ensurePlaybackAudioEl();
+  if(audioData){
+    el.src = audioData;
+    el.play().catch(()=>{ toast("自動播放被瀏覽器擋下，請手動點一下畫面再試"); });
+  }
+}
 
 /* ---------- 隨機抽卡（排除已使用過的卡） ---------- */
 function drawRandom(pool){
@@ -229,19 +312,28 @@ function renderPhaseAction(){
   }
 
   if(game.phase === "record"){
-    const confirmed = game.recordingConfirmed || {};
-    let html = `<p class="help-text" style="margin-top:10px;">請每位玩家打開手機錄音功能（或任何錄音 App），開始錄下接下來這段對話，並在下方確認。全員確認後才能繼續下一步。</p>`;
+    const recordings = game.recordings || {};
+    let html = `<p class="help-text" style="margin-top:10px;">每位玩家請對著自己的裝置錄音（其他人聽不到你錄的內容，只會看到你「已完成」）。可以重新錄製，只會保留最後一次的結果。全員都錄好後才能繼續。</p>`;
     html += `<div class="assign-table">`;
     memberIds.forEach(mid=>{
       const name = escapeHtml((state.members[mid]||{}).name || mid);
-      const done = !!confirmed[mid];
-      const canClick = mid === state.memberId;
+      const hasRecording = !!recordings[mid];
+      const isYou = mid === state.memberId;
       html += `<div class="assign-row">
-        <div class="assign-value" style="text-align:left; flex:1;">${name}</div>
-        ${done
-          ? `<span style="color:var(--accent-dark); font-weight:700;">✅ 已確認</span>`
-          : (canClick ? `<button class="small-btn" data-action="confirm-recording">我已開始錄音</button>` : `<span class="charlog-lock" style="padding:0;">尚未確認</span>`)}
-      </div>`;
+        <div class="assign-value" style="text-align:left; flex:1;">${name}</div>`;
+      if(!isYou){
+        html += hasRecording
+          ? `<span style="color:var(--accent-dark); font-weight:700;">✅ 已完成</span>`
+          : `<span class="charlog-lock" style="padding:0;">尚未錄音</span>`;
+      } else if(recordingActive){
+        html += `<button class="small-btn" data-action="stop-recording" style="background:var(--danger);">⏹ 停止錄音</button>`;
+      } else if(hasRecording){
+        html += `<span style="color:var(--accent-dark); font-weight:700; margin-right:6px;">✅ 已完成</span>
+                  <button class="small-btn ghost" data-action="start-recording">🔁 重新錄製</button>`;
+      } else {
+        html += `<button class="small-btn" data-action="start-recording">🎙 開始錄音</button>`;
+      }
+      html += `</div>`;
     });
     html += `</div>`;
     area.innerHTML = html;
@@ -249,17 +341,21 @@ function renderPhaseAction(){
   }
 
   if(game.phase === "playback"){
-    const order = memberIds;
+    const order = getPlaybackOrder();
     const idx = game.playbackIndex||0;
-    let html = `<p class="help-text" style="margin-top:10px;">計時結束，依序輪流播放每位玩家步驟５錄下的錄音。輪到的玩家播放完畢後按下方按鈕，才會換下一位。</p>`;
+    let html = `<p class="help-text" style="margin-top:10px;">計時結束，依照查理→達珂塔→傑克→茱莉安→埃文的順序播放每個人的錄音，全員都聽得到。輪到的玩家按「播放」，聽完後按「下一位」換下一個人。</p>`;
     html += `<div class="assign-table">`;
     order.forEach((mid,i)=>{
       const name = escapeHtml((state.members[mid]||{}).name || mid);
       let status;
       if(i < idx) status = `<span style="color:var(--accent-dark); font-weight:700;">✅ 已播放</span>`;
-      else if(i === idx) status = (mid===state.memberId)
-        ? `<button class="small-btn" data-action="playback-next">▶ 播放完畢，換下一位</button>`
-        : `<span class="charlog-lock" style="padding:0;">🔊 輪到 ${name} 播放中…</span>`;
+      else if(i === idx){
+        if(mid===state.memberId){
+          status = `<button class="small-btn" data-action="play-recording" style="margin-right:6px;">▶ 播放</button><button class="small-btn ghost" data-action="playback-next">下一位</button>`;
+        } else {
+          status = `<span class="charlog-lock" style="padding:0;">🔊 輪到 ${name} 播放中…</span>`;
+        }
+      }
       else status = `<span class="charlog-lock" style="padding:0;">等待中</span>`;
       html += `<div class="assign-row">
         <div class="assign-value" style="text-align:left; flex:1;">${i+1}. ${name}</div>
@@ -296,7 +392,10 @@ function render(){
   const nextBtn = $("btnPhaseNext");
   const hasCharlie = !!(game.roleAssign||{})["S07-1"];
   const allRecorded = memberIds.length>0 && memberIds.every(mid=>(game.recordingConfirmed||{})[mid]);
-  const allPlayed = (game.playbackIndex||0) >= memberIds.length;
+  const playbackOrder = getPlaybackOrder();
+  const allPlayed = (game.playbackIndex||0) >= playbackOrder.length;
+
+  if(game.phase === "playback") checkPlaybackTrigger();
 
   nextBtn.innerHTML = `下一步`;
   nextBtn.disabled = false;
@@ -561,15 +660,24 @@ document.addEventListener("click", e=>{
     update(patch);
   }
 
-  if(action === "confirm-recording"){
-    const patch = {}; patch[`recordingConfirmed/${state.memberId}`] = true;
-    update(patch);
+  if(action === "start-recording"){
+    startRecording();
+  }
+  if(action === "stop-recording"){
+    stopRecording();
+  }
+
+  if(action === "play-recording"){
+    const order = getPlaybackOrder();
+    const idx = game.playbackIndex||0;
+    if(order[idx] !== state.memberId) return;
+    update({ playbackTrigger: { index: idx, ts: Date.now() } });
   }
 
   if(action === "playback-next"){
-    const memberIds = Object.keys(state.members||{});
+    const order = getPlaybackOrder();
     const idx = game.playbackIndex||0;
-    if(memberIds[idx] !== state.memberId) return;
+    if(order[idx] !== state.memberId) return;
     update({ playbackIndex: idx+1 });
   }
 
@@ -627,7 +735,8 @@ $("btnPhaseNext").addEventListener("click", ()=>{
     return;
   }
   if(next === "end" && game.phase === "playback"){
-    if((game.playbackIndex||0) < memberIds.length){
+    const playbackOrder = getPlaybackOrder();
+    if((game.playbackIndex||0) < playbackOrder.length){
       toast("要等所有玩家都播放完錄音，才能繼續");
       return;
     }

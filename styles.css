@@ -2,12 +2,12 @@
    取自《Alice is Missing》主視覺：暮色山巒的紫灰天空過渡到珊瑚粉，
    剪影般的深紫墨色人物，與標題副標的暖橘珊瑚色。 */
 :root{
-  --accent:#E15B3F;
-  --accent-dark:#C2472F;
-  --accent-soft:#F3C9AE;
+  --accent:#D9527A;
+  --accent-dark:#B23D60;
+  --accent-soft:#F6D4DE;
   --bg-chat:#f4f1ee;
   --bg-chat-2:#f7f5f3;
-  --bubble-me:#F0A98C;
+  --bubble-me:#F3BBD1;
   --bubble-them:#ffffff;
   --ink:#1c1420;
   --ink-soft:#6b5b68;
@@ -49,7 +49,7 @@ body{
 /* ===== Top bar ===== */
 .topbar{
   padding:calc(10px + var(--safe-top)) 16px 10px;
-  background:var(--ink);
+  background:linear-gradient(120deg, #17121b 0%, #4a2436 55%, var(--accent) 100%);
   color:#fff;
   display:flex;
   align-items:center;
@@ -161,7 +161,7 @@ textarea{resize:vertical; min-height:80px; font-family:monospace; font-size:12px
   font-size:12px; padding:8px 10px; border-radius:8px; margin-top:8px;
   display:flex; align-items:center; gap:6px;
 }
-.status-ok{background:#fbeae4; color:var(--accent-dark);}
+.status-ok{background:var(--accent-soft); color:var(--accent-dark);}
 .status-err{background:#fdeceb; color:var(--danger);}
 .status-wait{background:#f1f3f2; color:var(--ink-soft);}
 
@@ -296,7 +296,7 @@ summary{font-size:13px; color:var(--accent-dark); cursor:pointer; padding:4px 0;
 .charlog-role-opt{
   padding:6px 10px; border-radius:999px; border:1.5px solid var(--line); font-size:12px; cursor:pointer; background:#fff;
 }
-.charlog-role-opt.picked{ border-color:var(--accent); background:#fbeae4; color:var(--accent-dark); font-weight:700; }
+.charlog-role-opt.picked{ border-color:var(--accent); background:var(--accent-soft); color:var(--accent-dark); font-weight:700; }
 .charlog-role-tag{ font-size:14px; font-weight:800; margin:0 2px 10px; }
 
 /* ===== 指派表格（assign 階段） ===== */
@@ -314,7 +314,7 @@ summary{font-size:13px; color:var(--accent-dark); cursor:pointer; padding:4px 0;
 /* ===== 抽卡佇列（live 階段） ===== */
 .draw-queue{ display:flex; flex-direction:column; gap:8px; margin-top:12px; }
 .draw-row{ padding:10px; border-radius:var(--radius-md); border:1.5px solid var(--line); background:#f8f9f8; }
-.draw-row.active{ border-color:var(--accent); background:#fbf5f2; }
+.draw-row.active{ border-color:var(--accent); background:var(--accent-soft); }
 .draw-row.done{ opacity:.75; }
 .draw-row.upcoming{ opacity:.55; }
 .draw-row-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
@@ -356,7 +356,7 @@ summary{font-size:13px; color:var(--accent-dark); cursor:pointer; padding:4px 0;
 
 .conclusion-box{
   margin-top:14px; padding:12px; border-radius:var(--radius-md);
-  background:#fbf9f8; border:1.5px solid var(--accent);
+  background:var(--accent-soft); border:1.5px solid var(--accent);
 }
 .conclusion-box .ctitle{ font-size:12px; font-weight:800; color:var(--accent-dark); margin-bottom:8px; text-align:center; letter-spacing:2px; }
 .conclusion-row{ display:flex; gap:10px; }
@@ -370,7 +370,7 @@ summary{font-size:13px; color:var(--accent-dark); cursor:pointer; padding:4px 0;
 
 .coin-quote{
   margin-top:8px; padding:10px 14px; border-radius:var(--radius-md);
-  background:#faf8f7; border:1.5px solid var(--accent);
+  background:var(--accent-soft); border:1.5px solid var(--accent);
   color:var(--ink);
   font-size:14px; font-weight:700; text-align:center; line-height:1.5;
 }

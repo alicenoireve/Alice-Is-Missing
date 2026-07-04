@@ -4,7 +4,7 @@
    ========================================================= */
 
 const TIMER_DURATION_SEC = 90 * 60; // 1.5 小時，固定不可調整
-const AVATAR_COLORS = ["#E15B3F","#7C6A92","#D9A441","#5B7B9C","#B5546B","#8A7B4F"];
+const AVATAR_COLORS = ["#D9527A","#7C6A92","#D9A441","#5B7B9C","#8A4F66","#8A7B4F"];
 const MAX_MEMBERS = 5;
 
 let db = null;
