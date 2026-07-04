@@ -740,7 +740,9 @@ $("btnPhaseNext").addEventListener("click", ()=>{
       toast("要等所有玩家都播放完錄音，才能繼續");
       return;
     }
-    update({ phase: next, finaleRevealed: true });
+    // 播放完畢、遊戲結束：把所有人的錄音從雲端資料庫刪除，不留存
+    update({ phase: next, finaleRevealed: true, recordings: null, playbackTrigger: null });
+    toast("已刪除所有錄音檔");
     return;
   }
 

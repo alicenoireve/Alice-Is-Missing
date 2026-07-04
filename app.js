@@ -4,7 +4,7 @@
    ========================================================= */
 
 const TIMER_DURATION_SEC = 90 * 60; // 1.5 小時，固定不可調整
-const AVATAR_COLORS = ["#A85D72","#7C6A92","#D9A441","#5B7B9C","#8A4F66","#8A7B4F"];
+const AVATAR_COLORS = ["#B26770","#7C6A92","#D9A441","#5B7B9C","#8A4F66","#8A7B4F"];
 const MAX_MEMBERS = 5;
 
 let db = null;
@@ -176,7 +176,15 @@ $("btnJoinRoom").addEventListener("click", async ()=>{
 
 $("btnLeaveRoom").addEventListener("click", async ()=>{
   if(state.roomId && state.memberId && db){
-    try{ await db.ref(`rooms/${state.roomId}/members/${state.memberId}`).remove(); }catch(e){}
+    try{
+      const roomId = state.roomId;
+      await db.ref(`rooms/${roomId}/members/${state.memberId}`).remove();
+      // 如果離開後房間已經沒人了，順便把整個房間資料清掉（含錄音檔），不留在雲端
+      const remainSnap = await db.ref(`rooms/${roomId}/members`).get();
+      if(!remainSnap.exists() || Object.keys(remainSnap.val()||{}).length === 0){
+        await db.ref(`rooms/${roomId}`).remove();
+      }
+    }catch(e){}
   }
   detachAll();
   localStorage.removeItem("roomSession");
