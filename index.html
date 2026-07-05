@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
-<title>密談室｜跑團聊天室</title>
+<title>Alice Is Missing - A Silent Role Playing Game</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -245,12 +245,11 @@
         </div>
       </div>
 
-      <!-- 音樂歌單 -->
-      <div class="card">
-        <h2><span class="num">🎵</span>官方配樂歌單</h2>
-        <p class="help-text" style="margin-top:0;">開始計時的同時，系統會試著自動按下播放（瀏覽器政策限制，不一定每次都能自動成功，失敗的話手動點一下播放鍵即可）。</p>
-        <div id="spotifyEmbedWrap" style="border-radius:12px; overflow:hidden;">
-          <iframe id="spotifyIframe" style="border-radius:12px;" src="https://open.spotify.com/embed/playlist/71Qpjf8iYioDNqwWCBzRgr?utm_source=generator&theme=0"
+      <!-- 音樂歌單（進入房間後才顯示） -->
+      <div class="card" id="musicCard" style="display:none;">
+        <h2><span class="num">🎵</span>配樂</h2>
+        <div id="spotifyEmbedWrap" style="border-radius:12px; overflow:hidden; height:152px; max-height:152px;">
+          <iframe id="spotifyIframe" style="border-radius:12px; display:block;" src="https://open.spotify.com/embed/playlist/71Qpjf8iYioDNqwWCBzRgr?utm_source=generator&theme=0"
             width="100%" height="152" frameborder="0"
             allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
         </div>

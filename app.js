@@ -192,6 +192,7 @@ $("btnLeaveRoom").addEventListener("click", async ()=>{
   $("roomJoinedBlock").style.display = "none";
   $("roomJoinBlock").style.display = "block";
   $("gamePanel").style.display = "none";
+  $("musicCard").style.display = "none";
   $("roomPill").textContent = "尚未加入房間";
   $("msgGate").style.display = "flex";
   $("msgContent").style.display = "none";
@@ -223,6 +224,7 @@ function enterRoom(roomId, memberId, name){
   $("roomCodeDisplay").textContent = roomId;
   $("roomPill").textContent = roomId;
   $("gamePanel").style.display = "block";
+  $("musicCard").style.display = "block";
   $("msgGate").style.display = "none";
   $("msgContent").style.display = "flex";
 

@@ -49,7 +49,7 @@ body{
 /* ===== Top bar ===== */
 .topbar{
   padding:calc(10px + var(--safe-top)) 16px 10px;
-  background:linear-gradient(120deg, #17121b 0%, #453541 55%, var(--accent) 100%);
+  background:linear-gradient(120deg, #2f181b 0%, #8e4850 60%, #a2535c 100%);
   color:#fff;
   display:flex;
   align-items:center;
@@ -95,7 +95,7 @@ body{
 .view.active{display:flex;}
 
 /* ===== SETTINGS TAB ===== */
-#view-settings{
+#view-settings, #view-config{
   flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;
   background:#f4f6f5;
 }
