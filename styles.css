@@ -2,12 +2,12 @@
    取自《Alice is Missing》主視覺：暮色山巒的紫灰天空過渡到珊瑚粉，
    剪影般的深紫墨色人物，與標題副標的暖橘珊瑚色。 */
 :root{
-  --accent:#BA7880;
-  --accent-dark:#8E4850;
+  --accent:#B26770;
+  --accent-dark:#804149;
   --accent-soft:#F1E4E6;
   --bg-chat:#f4f1ee;
   --bg-chat-2:#f7f5f3;
-  --bubble-me:#DDBBBF;
+  --bubble-me:#E0C2C6;
   --bubble-them:#ffffff;
   --ink:#1c1420;
   --ink-soft:#6b5b68;
@@ -49,7 +49,7 @@ body{
 /* ===== Top bar ===== */
 .topbar{
   padding:calc(10px + var(--safe-top)) 16px 10px;
-  background:linear-gradient(120deg, #804149 0%, var(--accent) 100%);
+  background:linear-gradient(120deg, #17121b 0%, #453541 55%, var(--accent) 100%);
   color:#fff;
   display:flex;
   align-items:center;
