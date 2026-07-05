@@ -852,6 +852,73 @@ function renderCharLogTab(){
 
 function loadCharLog(){ /* 資料在 mountCharLog 時讀取，這裡預留擴充 */ }
 
+function exportCharLogHtml(roleCode){
+  const data = loadCharLogData();
+  const roleName = roleCode ? ROLE_NAMES[roleCode] : "（尚未選擇角色）";
+  const myName = escapeHtml((state.members[state.memberId]||{}).name || "");
+
+  const locRows = LOCATION_LIST.map((loc,i)=>`
+    <div class="item"><div class="iname">${escapeHtml(loc)}</div><div class="inote">${escapeHtml(data.locNotes?.[i]||"（無筆記）")}</div></div>`).join("");
+  const pplRows = PEOPLE_LIST.map((p,i)=>`
+    <div class="item"><div class="iname">${escapeHtml(p)}</div><div class="inote">${escapeHtml(data.peopleNotes?.[i]||"（無筆記）")}</div></div>`).join("");
+
+  return `<!DOCTYPE html>
+<html lang="zh-Hant"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>角色紀錄</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",sans-serif; background:#f4f2f0; color:#1c1420; margin:0; padding:20px;}
+  .wrap{max-width:680px; margin:0 auto;}
+  header{margin-bottom:24px;}
+  header h1{font-size:20px; margin:0 0 4px;}
+  header .sub{font-size:13px; color:#6b5b68;}
+  section{background:#fff; border-radius:14px; padding:16px 18px; margin-bottom:18px; box-shadow:0 1px 3px rgba(0,0,0,.06);}
+  section h2{font-size:15px; margin:0 0 12px; padding-bottom:8px; border-bottom:1px solid #ece7e3; color:#1c1420;}
+  .secret{font-size:14px; line-height:1.6; white-space:pre-wrap;}
+  .item{margin:10px 0;}
+  .item .iname{font-weight:700; font-size:13px; margin-bottom:2px;}
+  .item .inote{font-size:13.5px; line-height:1.5; color:#3a2f36; white-space:pre-wrap;}
+  footer{text-align:center; font-size:11px; color:#b4a9ae; margin-top:20px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>📝 角色紀錄</h1>
+    <div class="sub">玩家：${myName}　角色：${escapeHtml(roleName)}　匯出時間：${new Date().toLocaleString()}</div>
+  </header>
+  <section>
+    <h2>我的秘密</h2>
+    <div class="secret">${escapeHtml(data.secret||"（尚未填寫）")}</div>
+  </section>
+  <section>
+    <h2>地點</h2>
+    ${locRows}
+  </section>
+  <section>
+    <h2>人物</h2>
+    ${pplRows}
+  </section>
+  <footer>由密談室聊天網站匯出（此紀錄僅存在你自己的裝置上）</footer>
+</div>
+</body></html>`;
+}
+
+$("btnExportCharlog").addEventListener("click", ()=>{
+  const roleCode = game ? Object.keys(game.roleAssign||{}).find(c=>game.roleAssign[c]===state.memberId) : null;
+  const html = exportCharLogHtml(roleCode);
+  const blob = new Blob([html], {type:"text/html;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `角色紀錄_${(state.members[state.memberId]||{}).name||"我"}_${Date.now()}.html`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast("已匯出角色紀錄");
+});
+
 function mountCharLog(mount, roleCode){
   if(!mount) return;
   const data = loadCharLogData();
