@@ -223,7 +223,7 @@ function enterRoom(roomId, memberId, name){
   $("roomJoinedBlock").style.display = "block";
   $("roomCodeDisplay").textContent = roomId;
   $("roomPill").textContent = roomId;
-  $("gamePanel").style.display = "block";
+  $("gamePanel").style.display = "flex";
   $("musicCard").style.display = "block";
   $("msgGate").style.display = "none";
   $("msgContent").style.display = "flex";

@@ -66,9 +66,9 @@ const COIN_TEXT = {
   "S12-6": { heads:"你們兩人找到逃生的方法", tails:"愛麗絲逃脫，但你前來救他的角色沒有" }
 };
 
-const PHASES = ["intro","roles","assign","record","ready","live","playback","end"];
+const PHASES = ["intro","poster","roles","assign","record","ready","live","playback","end"];
 const PHASE_LABELS = {
-  intro:"開場", roles:"選擇角色與動機", assign:"分配劇情卡時間", record:"錄音準備",
+  intro:"開場", poster:"選擇失蹤海報", roles:"選擇角色與動機", assign:"分配劇情卡時間", record:"錄音準備",
   ready:"準備開始", live:"遊戲進行中", playback:"播放錄音", end:"結局"
 };
 
@@ -107,7 +107,7 @@ function onRoomEnter(){
         roleAssign:{}, motiveAssign:{}, timerSlotAssign:{}, timerSlotDraw:{},
         sharedPools:{ location:{revealed:{}, finalCode:null, finalSetBy:null}, suspect:{revealed:{}, finalCode:null, finalSetBy:null}, clue:{revealed:{}} },
         finalDraw:{ code:null, coin:null, text:null },
-        recordingConfirmed:{}, recordings:{}, playbackIndex:0, playbackTrigger:null,
+        recordingConfirmed:{}, recordings:{}, playbackIndex:0, playbackTrigger:null, phaseConfirm:{}, posterPickerId:null, posterIndex:0, posterSelected:null,
         usedCards:{}, finaleRevealed:false
       });
     }
@@ -132,7 +132,7 @@ function emptyGame(){
     phase:"intro", roleAssign:{}, motiveAssign:{}, timerSlotAssign:{}, timerSlotDraw:{},
     sharedPools:{ location:{revealed:{},finalCode:null,finalSetBy:null}, suspect:{revealed:{},finalCode:null,finalSetBy:null}, clue:{revealed:{}} },
     finalDraw:{ code:null, coin:null, text:null },
-    recordingConfirmed:{}, recordings:{}, playbackIndex:0, playbackTrigger:null,
+    recordingConfirmed:{}, recordings:{}, playbackIndex:0, playbackTrigger:null, phaseConfirm:{}, posterPickerId:null, posterIndex:0, posterSelected:null,
     usedCards:{}, finaleRevealed:false
   };
 }
@@ -232,6 +232,35 @@ function renderPhaseAction(){
   const area = $("phaseActionArea");
   if(!area) return;
   const memberIds = Object.keys(state.members||{});
+
+  if(game.phase === "poster"){
+    // 進入此階段時，隨機指定一位玩家代表選擇海報（此時角色尚未分配，無法排除查理）
+    if(!game.posterPickerId && memberIds.length>0){
+      const pick = memberIds[Math.floor(Math.random()*memberIds.length)];
+      update({ posterPickerId: pick, posterIndex: 0 });
+      return;
+    }
+    const pickerId = game.posterPickerId;
+    const isPicker = pickerId === state.memberId;
+    const idx = (game.posterIndex||0) + 1; // 海報檔名 1~10
+    const pickerName = escapeHtml((state.members[pickerId]||{}).name || "");
+
+    let html = `
+      <p class="help-text" style="margin-top:10px; font-size:15px; font-weight:700; color:var(--ink);">請選擇愛麗絲的失蹤海報：</p>
+      <p class="help-text" style="margin-top:0;">${isPicker? "輪到你選擇，用左右按鈕瀏覽，選好後按下方「下一步」即可鎖定。" : `由 <b>${pickerName}</b> 負責選擇，你只需要等待並按「下一步」。`}</p>
+      <div class="intro-card-wrap" style="display:block;">
+        <img src="assets/posters/poster${idx}.jpg" alt="海報 ${idx}">
+        <div class="cap" style="margin-top:6px;">海報 ${idx} / 10</div>
+      </div>`;
+    if(isPicker){
+      html += `<div class="btn-row" style="margin-top:10px;">
+        <button class="btn btn-ghost" data-action="poster-prev">◀ 上一張</button>
+        <button class="btn btn-ghost" data-action="poster-next">下一張 ▶</button>
+      </div>`;
+    }
+    area.innerHTML = html;
+    return;
+  }
 
   if(game.phase === "roles"){
     const roleCount = Object.keys(game.roleAssign||{}).length;
@@ -388,8 +417,9 @@ function render(){
   $("phaseLabel").textContent = "階段：" + PHASE_LABELS[game.phase];
   const memberIds = Object.keys(state.members||{});
 
-  // 下一步按鈕文字與是否可按（依階段而定的各種前置條件）
+  // 下一步按鈕：改成「我準備好了」的全員確認機制，不再有上一步
   const nextBtn = $("btnPhaseNext");
+  const confirmNote = $("phaseConfirmNote");
   const hasCharlie = !!(game.roleAssign||{})["S07-1"];
   const allRecorded = memberIds.length>0 && memberIds.every(mid=>(game.recordingConfirmed||{})[mid]);
   const playbackOrder = getPlaybackOrder();
@@ -397,21 +427,39 @@ function render(){
 
   if(game.phase === "playback") checkPlaybackTrigger();
 
-  nextBtn.innerHTML = `下一步`;
-  nextBtn.disabled = false;
-  if(game.phase === "intro"){
-    nextBtn.disabled = memberIds.length < 2;
-  } else if(game.phase === "record"){
-    nextBtn.disabled = !allRecorded;
-  } else if(game.phase === "ready"){
-    nextBtn.innerHTML = `下一步<span class="sub">開始計時</span>`;
-    nextBtn.disabled = !hasCharlie;
-  } else if(game.phase === "playback"){
-    nextBtn.disabled = !allPlayed;
-  } else if(game.phase === "end"){
-    nextBtn.disabled = true;
+  let gateOk = true, gateMsg = "";
+  if(game.phase === "intro" && memberIds.length < 2){ gateOk=false; gateMsg="至少需要 2 位玩家才能開始"; }
+  else if(game.phase === "record" && !allRecorded){ gateOk=false; gateMsg="要等所有人都錄好音"; }
+  else if(game.phase === "ready" && !hasCharlie){ gateOk=false; gateMsg="需要有玩家選擇查理"; }
+  else if(game.phase === "playback" && !allPlayed){ gateOk=false; gateMsg="要等所有人都播放完錄音"; }
+
+  const confirm = game.phaseConfirm || {};
+  const confirmedCount = memberIds.filter(m=>confirm[m]).length;
+  const iConfirmed = !!confirm[state.memberId];
+  const nextLabel = (game.phase==="ready") ? `下一步<span class="sub">開始計時</span>` : `下一步`;
+
+  if(game.phase === "end"){
+    nextBtn.style.display = "none";
+    confirmNote.style.display = "none";
+  } else {
+    nextBtn.style.display = "";
+    confirmNote.style.display = "block";
+    if(!gateOk){
+      nextBtn.disabled = true;
+      nextBtn.innerHTML = nextLabel;
+      confirmNote.textContent = "⚠️ " + gateMsg;
+    } else if(iConfirmed){
+      nextBtn.disabled = true;
+      nextBtn.innerHTML = `已確認<span class="sub">等待其他人</span>`;
+      confirmNote.textContent = `${confirmedCount} / ${memberIds.length} 人已準備`;
+    } else {
+      nextBtn.disabled = false;
+      nextBtn.innerHTML = nextLabel;
+      confirmNote.textContent = `${confirmedCount} / ${memberIds.length} 人已準備`;
+    }
   }
-  $("btnPhasePrev").disabled = (phaseIdx<=0);
+
+  tryAdvancePhase();
 
   // 開場卡
   $("introCardWrap").style.display = (game.phase==="intro") ? "block" : "none";
@@ -462,34 +510,7 @@ function renderPlayerBlocks(){
       </div>
     `;
 
-    // ===== 角色 =====
-    html += `<div class="block-section-label">角色</div>`;
-    if(roleCode){
-      html += `<div class="slot-row"><div class="card-slot large"><img src="${cardImg(roleCode,'face')}"><div class="cap">${roleCode}</div></div></div>`;
-    } else if(isYou){
-      const taken = new Set(Object.keys(game.roleAssign||{}));
-      html += `<div class="pick-row">`;
-      ROLE_CODES.forEach(code=>{
-        const disabled = taken.has(code);
-        html += `<button class="pick-btn" ${disabled?"disabled":""} data-action="pick-role" data-code="${code}">${ROLE_NAMES[code]}</button>`;
-      });
-      html += `</div>`;
-    } else {
-      html += `<div class="card-slot large placeholder">?</div>`;
-    }
-
-    // ===== 動機（全員選完角色後才能開始抽）=====
-    const allRolesAssigned = Object.keys(game.roleAssign||{}).length === memberIds.length;
-    html += `<div class="block-section-label">動機</div>`;
-    if(motiveCode){
-      html += `<div class="slot-row"><div class="card-slot large"><img src="${cardImg(motiveCode,'face')}"><div class="cap">${motiveCode}</div></div></div>`;
-    } else if(!allRolesAssigned){
-      html += `<div class="charlog-lock">🔒 等待所有玩家選完角色後才能抽動機</div>`;
-    } else if(isYou){
-      html += `<div class="pick-row"><button class="small-btn" data-action="draw-motive">🎴 抽取動機</button></div>`;
-    } else {
-      html += `<div class="card-slot large placeholder">?</div>`;
-    }
+    // 角色／動機已搬到「紀錄」分頁自己查看，這裡不再顯示
 
     // ===== 劇情卡時間分配（assign 階段：主持人指派）=====
     const myGroups = TIMER_GROUPS.filter(g=>{
@@ -502,29 +523,6 @@ function renderPlayerBlocks(){
                       + (roleCode === "S07-1" ? 1 : 0);
       html += `<div class="block-section-label">劇情卡分配　目前：${myCount} 張${roleCode==="S07-1"?"（含固定的 90）":""}</div>`;
       html += `<div class="charlog-sub">到上方「現在階段」區塊指派每組劇情卡的負責人。</div>`;
-    }
-
-    // ===== 劇情卡（live 階段顯示，唯讀；抽取動作在上方「現在階段」區塊；僅本人看得到卡面） =====
-    if(["live","playback","end"].includes(game.phase) && myGroups.length){
-      html += `<div class="block-section-label">劇情卡（依剩餘分鐘）</div><div class="slot-row">`;
-      myGroups.forEach(g=>{
-        const drawState = (game.timerSlotDraw||{})[g.key];
-        const drawn = drawState && drawState.drawn;
-        const backCode = g.cards[0];
-        if(!isYou){
-          html += `<div class="card-slot large placeholder">${drawn?'🔒':'?'}</div>`;
-        } else {
-          html += `<div class="card-slot large">`;
-          if(drawn){
-            html += `<img src="${cardImg(drawState.code,'face')}">`;
-          } else {
-            html += `<img src="${cardImg(backCode,'back')}" style="opacity:.9;">`;
-          }
-          html += `<div class="badge">${g.label}</div><div class="cap">${drawn? drawState.code : "未抽取"}</div>`;
-          html += `</div>`;
-        }
-      });
-      html += `</div>`;
     }
 
     block.innerHTML = html;
@@ -695,6 +693,13 @@ document.addEventListener("click", e=>{
     update(patch);
   }
 
+  if(action === "poster-prev" || action === "poster-next"){
+    if(game.posterPickerId !== state.memberId) return;
+    let idx = game.posterIndex||0;
+    idx = action==="poster-next" ? (idx+1)%10 : (idx-1+10)%10;
+    update({ posterIndex: idx });
+  }
+
   if(action === "auto-assign"){
     autoDistributeTimerSlots();
   }
@@ -715,45 +720,64 @@ document.addEventListener("click", e=>{
   }
 });
 
+function tryAdvancePhase(){
+  if(!game || game.phase === "end") return;
+  const memberIds = Object.keys(state.members||{});
+  if(memberIds.length===0) return;
+  const confirm = game.phaseConfirm || {};
+  const allConfirmed = memberIds.every(m=>confirm[m]);
+  if(!allConfirmed) return;
+
+  const hasCharlie = !!(game.roleAssign||{})["S07-1"];
+  const allRecorded = memberIds.every(mid=>(game.recordingConfirmed||{})[mid]);
+  const playbackOrder = getPlaybackOrder();
+  const allPlayed = (game.playbackIndex||0) >= playbackOrder.length;
+
+  if(game.phase==="intro" && memberIds.length<2) return;
+  if(game.phase==="record" && !allRecorded) return;
+  if(game.phase==="ready" && !hasCharlie) return;
+  if(game.phase==="playback" && !allPlayed) return;
+
+  const idx = PHASES.indexOf(game.phase);
+  const next = PHASES[idx+1];
+  if(!next) return;
+
+  const patch = { phase: next, phaseConfirm: {} };
+  if(next === "end" && game.phase === "playback"){
+    patch.finaleRevealed = true;
+    patch.recordings = null;
+    patch.playbackTrigger = null;
+  }
+  update(patch);
+  if(next === "live"){ startGameTimer(); }
+}
+
 $("btnPhaseNext").addEventListener("click", ()=>{
   if(!game) return;
-  const idx = PHASES.indexOf(game.phase);
-  if(idx >= PHASES.length-1) return;
-  const next = PHASES[idx+1];
   const memberIds = Object.keys(state.members||{});
+  const hasCharlie = !!(game.roleAssign||{})["S07-1"];
+  const allRecorded = memberIds.length>0 && memberIds.every(mid=>(game.recordingConfirmed||{})[mid]);
+  const playbackOrder = getPlaybackOrder();
+  const allPlayed = (game.playbackIndex||0) >= playbackOrder.length;
 
   if(game.phase === "intro" && memberIds.length < 2){
-    toast("至少需要 2 位玩家才能開始遊戲");
-    return;
+    toast("⚠️ 至少需要 2 位玩家才能開始遊戲"); return;
   }
-  if(next === "ready" && game.phase === "record"){
-    const allConfirmed = memberIds.every(mid => (game.recordingConfirmed||{})[mid]);
-    if(!allConfirmed){ toast("要等所有玩家都確認開始錄音，才能繼續"); return; }
+  if(game.phase === "record" && !allRecorded){
+    toast("⚠️ 要等所有人都錄好音才能繼續"); return;
   }
-  if(next === "live" && !(game.roleAssign||{})["S07-1"]){
-    toast("需要有玩家選擇「查理」角色，才能開始遊戲");
-    return;
+  if(game.phase === "ready" && !hasCharlie){
+    toast("⚠️ 需要有玩家選擇查理才能開始遊戲"); return;
   }
-  if(next === "end" && game.phase === "playback"){
-    const playbackOrder = getPlaybackOrder();
-    if((game.playbackIndex||0) < playbackOrder.length){
-      toast("要等所有玩家都播放完錄音，才能繼續");
-      return;
-    }
-    // 播放完畢、遊戲結束：把所有人的錄音從雲端資料庫刪除，不留存
-    update({ phase: next, finaleRevealed: true, recordings: null, playbackTrigger: null });
-    toast("已刪除所有錄音檔");
-    return;
+  if(game.phase === "playback" && !allPlayed){
+    toast("⚠️ 要等所有人都播放完錄音才能繼續"); return;
   }
 
-  update({ phase: next });
-  if(next === "live"){ startGameTimer(); }
-});
-$("btnPhasePrev").addEventListener("click", ()=>{
-  if(!game) return;
-  const idx = PHASES.indexOf(game.phase);
-  if(idx<=0) return;
-  update({ phase: PHASES[idx-1] });
+  const patch = {}; patch[`phaseConfirm/${state.memberId}`] = true;
+  if(game.phase === "poster" && game.posterPickerId === state.memberId){
+    patch.posterSelected = (game.posterIndex||0) + 1; // 存海報檔名編號(1~10)
+  }
+  update(patch);
 });
 $("btnExportFinal").addEventListener("click", ()=>{
   if(window.exportInSceneLog) window.exportInSceneLog();
@@ -852,10 +876,13 @@ function renderCharLogTab(){
 
 function loadCharLog(){ /* 資料在 mountCharLog 時讀取，這裡預留擴充 */ }
 
-function exportCharLogHtml(roleCode){
+async function exportCharLogHtml(roleCode){
   const data = loadCharLogData();
   const roleName = roleCode ? ROLE_NAMES[roleCode] : "（尚未選擇角色）";
+  const motiveCode = game ? (game.motiveAssign||{})[state.memberId] : null;
   const myName = escapeHtml((state.members[state.memberId]||{}).name || "");
+  const posterIdx = game ? game.posterSelected : null;
+  const posterB64 = posterIdx ? await imgToBase64(`assets/posters/poster${posterIdx}.jpg`) : null;
 
   const locRows = LOCATION_LIST.map((loc,i)=>`
     <div class="item"><div class="iname">${escapeHtml(loc)}</div><div class="inote">${escapeHtml(data.locNotes?.[i]||"（無筆記）")}</div></div>`).join("");
@@ -885,8 +912,9 @@ function exportCharLogHtml(roleCode){
 <div class="wrap">
   <header>
     <h1>📝 角色紀錄</h1>
-    <div class="sub">玩家：${myName}　角色：${escapeHtml(roleName)}　匯出時間：${new Date().toLocaleString()}</div>
+    <div class="sub">玩家：${myName}　角色：${escapeHtml(roleName)}　動機：${motiveCode||"（尚未抽取）"}　匯出時間：${new Date().toLocaleString()}</div>
   </header>
+  ${posterB64 ? `<section><h2>愛麗絲的失蹤海報</h2><img src="${posterB64}" style="max-width:280px;display:block;margin:0 auto;border-radius:8px;"></section>` : ""}
   <section>
     <h2>我的秘密</h2>
     <div class="secret">${escapeHtml(data.secret||"（尚未填寫）")}</div>
@@ -904,9 +932,22 @@ function exportCharLogHtml(roleCode){
 </body></html>`;
 }
 
-$("btnExportCharlog").addEventListener("click", ()=>{
+async function imgToBase64(url){
+  try{
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return await new Promise(resolve=>{
+      const reader = new FileReader();
+      reader.onloadend = ()=>resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  }catch(e){ return null; }
+}
+
+$("btnExportCharlog").addEventListener("click", async ()=>{
   const roleCode = game ? Object.keys(game.roleAssign||{}).find(c=>game.roleAssign[c]===state.memberId) : null;
-  const html = exportCharLogHtml(roleCode);
+  toast("匯出中…");
+  const html = await exportCharLogHtml(roleCode);
   const blob = new Blob([html], {type:"text/html;charset=utf-8"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -927,11 +968,46 @@ function mountCharLog(mount, roleCode){
 
   const roleName = roleCode ? ROLE_NAMES[roleCode] : null;
   const roleColor = roleCode ? ROLE_COLORS[roleCode] : null;
+  const memberIds = Object.keys(state.members||{});
+  const motiveCode = game ? (game.motiveAssign||{})[state.memberId] : null;
+  const allRolesAssigned = game && memberIds.length>0 && Object.keys(game.roleAssign||{}).length === memberIds.length;
+  const posterIdx = game ? game.posterSelected : null;
 
   let html = `<div class="charlog-box">`;
-  if(roleName){
-    html += `<div class="charlog-role-tag" style="color:${roleColor};">你的角色：${roleName}</div>`;
+
+  if(posterIdx){
+    html += `<div class="charlog-sub" style="margin-top:0;">愛麗絲的失蹤海報</div>
+      <div class="intro-card-wrap" style="display:block; padding:4px 0 10px;">
+        <img src="assets/posters/poster${posterIdx}.jpg" alt="海報 ${posterIdx}">
+      </div>`;
   }
+
+  html += `<div class="charlog-sub" style="margin-top:0;">你的角色</div>`;
+  if(roleCode){
+    html += `<div class="slot-row"><div class="card-slot large"><img src="${cardImg(roleCode,'face')}"><div class="cap" style="color:${roleColor}; font-weight:700;">${roleName}</div></div></div>`;
+  } else if(game){
+    const taken = new Set(Object.keys(game.roleAssign||{}));
+    html += `<div class="pick-row">`;
+    ROLE_CODES.forEach(code=>{
+      const disabled = taken.has(code);
+      html += `<button class="pick-btn" ${disabled?"disabled":""} data-action="pick-role" data-code="${code}">${ROLE_NAMES[code]}</button>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `<div class="charlog-sub">你的動機</div>`;
+  if(motiveCode){
+    html += `<div class="slot-row"><div class="card-slot large"><img src="${cardImg(motiveCode,'face')}"><div class="cap">${motiveCode}</div></div></div>`;
+  } else if(!roleCode){
+    html += `<div class="charlog-lock">🔒 請先選擇角色</div>`;
+  } else if(!allRolesAssigned){
+    html += `<div class="charlog-lock">🔒 等待所有玩家選完角色後才能抽動機</div>`;
+  } else {
+    html += `<div class="pick-row"><button class="small-btn" data-action="draw-motive">🎴 抽取動機</button></div>`;
+  }
+
+  html += `<div style="height:1px;background:var(--line);margin:16px 0;"></div>`;
+
   html += `
     <label style="margin-top:0;">我的秘密</label>
     <textarea data-clfield="secret" placeholder="寫下你的秘密…">${escapeHtml(data.secret||"")}</textarea>

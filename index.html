@@ -39,12 +39,12 @@
           <div class="phase-bar">
             <span class="phase-label" id="phaseLabel">階段：準備中</span>
             <div class="btn-row" style="width:auto;">
-              <button class="btn btn-ghost" id="btnPhasePrev" style="width:auto; padding:8px 12px;">上一步</button>
               <button class="phase-btn" id="btnPhaseNext">
                 下一步
               </button>
             </div>
           </div>
+          <div class="phase-confirm-note" id="phaseConfirmNote" style="display:none;"></div>
 
           <!-- 開場卡 S01-1，僅在 intro 階段顯示 -->
           <div class="intro-card-wrap" id="introCardWrap" style="display:none;">
@@ -192,58 +192,49 @@
     </div>
   </div>
 
+  <!-- ============ 說明 TAB ============ -->
+  <div class="view" id="view-info">
+    <div style="flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; background:#f4f6f5;">
+      <div class="settings-scroll">
+        <div class="card">
+          <h2>📖 遊戲說明</h2>
+          <p class="help-text" style="margin-top:0; line-height:1.9;">
+            ◆ 今天是週六，寒假的第一天。除了查理以外，所有人開始遊戲時都知道愛麗絲最後一次露面是在週三，也就是 3 天前。<br><br>
+            ◆ 玩家可以使用括號（像這樣）或場外頻道在遊戲中進行任何場外的溝通。<br><br>
+            ◆ 如果有人說了你想要從遊戲中移除的內容，你可以用場外方式回覆「X」或「X：內容」來表示該內容已被使用 X-Card 移除。<br><br>
+            ◆ 沒事發生的時刻也沒關係。遊戲中可以且將會出現沈默。當群組聊天安靜下來時，可以考慮與其他角色啟動私人對話。<br><br>
+            ◆ 兩個角色永遠不能同時出現在同一個地點。如果他們剛好都在那裡，請在敘事中編造一個他們從未碰面的理由。<br><br>
+            ◆ 多花幾分鐘時間來回答你的線索卡也不要緊。儘量在下一張線索卡翻開前分享資訊。如果你做不到，就在下一個適當的時機傳達。<br><br>
+            ◆ 確保你告訴每個人來自你線索卡的資訊。你對線索卡問題的回答將決定遊戲敘事如何發展。<br><br>
+            ◆ 這 90 分鐘結束後，我們將永遠告別我們的角色。因此，你會希望在遊戲結束前，找到一種方式向至少一個人（如果不是向全組）揭露你的秘密。<br><br>
+            ◆ 你應該根據收到的線索進行調查和推測，但在觸發特定的線索卡之前，你不會找到真正導向愛麗絲的資訊。<br><br>
+            ◆ 除非你抽到說明你找到了愛麗絲的手機或汽車的卡片，否則你不會找到它們。<br><br>
+            ◆ 將你揭曉的嫌疑犯與地點卡面朝上放在各自的牌堆旁。<br><br>
+            ◆ 如果出於任何原因你的角色受傷或死亡，導致無法在剩餘時間內傳簡訊，你可以使用直接私訊，向任何前往你所在地點的人提供關於他們發現你時的狀態資訊。如果這種情況發生，觸發該事件的卡片會告訴你該怎麼做。<br><br>
+            ◆ 當計時器到達 00:00 時，玩家可以在遊戲結束前寫下最後一則角色身份的訊息。
+          </p>
+        </div>
+
+        <div class="card">
+          <h2>🖱 操作說明</h2>
+          <p class="help-text" style="margin-top:0; line-height:1.8;">
+            ・「遊戲」頁籤：依序進行開場、選海報、選角色與動機、分配劇情卡、錄音、正式計時等步驟，每個階段都要所有玩家各自按「下一步」確認，全員按完才會自動進入下一階段。<br>
+            ・「訊息」頁籤：左上角選單可切換群組／私訊頻道，右上角「場外」用於角色扮演之外的討論，不受計時限制。<br>
+            ・「紀錄」頁籤：只有你自己看得到，記錄你的角色、動機、秘密與線索筆記，可隨時編輯、隨時匯出。<br>
+            ・「設定」頁籤：建立或加入房間、查看成員、播放配樂。<br>
+            ・計時歸零、播放完錄音後，「遊戲」頁籤底部會出現「匯出所有場內對話紀錄」，可以下載保存整場對話。
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ============ 設定 TAB ============ -->
   <div class="view" id="view-config">
     <div class="settings-scroll">
 
-      <!-- 連線設定 -->
-      <div class="card" id="fbCard">
-        <h2><span class="num">1</span>連線設定（每台裝置只需設定一次）</h2>
-        <details id="fbDetails">
-          <summary>展開 Firebase 連線設定</summary>
-          <p class="help-text">
-            這個聊天室要多人跨裝置同步，需要一個免費的 Firebase 即時資料庫來當「訊息中繼站」，網站本身仍是純靜態頁面，可放心部署到 GitHub Pages。
-            <ol>
-              <li>前往 <a href="https://console.firebase.google.com" target="_blank">Firebase Console</a> 建立新專案（免費）</li>
-              <li>左側選單啟用「Realtime Database」，測試模式建立</li>
-              <li>專案設定 →新增「網頁應用程式」→ 複製 firebaseConfig 物件</li>
-              <li>整段貼到下方欄位即可</li>
-            </ol>
-          </p>
-          <label>貼上 firebaseConfig（直接從 Firebase 主控台複製整段貼上即可，不用自己改格式）</label>
-          <textarea id="fbConfigInput" placeholder='const firebaseConfig = {&#10;  apiKey: "...",&#10;  authDomain: "...",&#10;  databaseURL: "https://xxx.firebasedatabase.app",&#10;  projectId: "..."&#10;};'></textarea>
-          <div class="btn-row" style="margin-top:10px;">
-            <button class="btn btn-primary" id="btnSaveFb">儲存並連線</button>
-          </div>
-          <div id="fbStatus" class="status-line status-wait">尚未連線</div>
-        </details>
-      </div>
-
-      <!-- 房間 -->
-      <div class="card" id="roomCard">
-        <h2><span class="num">2</span>房間</h2>
-        <div id="roomJoinBlock">
-          <label>你的暱稱</label>
-          <input type="text" id="nicknameInput" placeholder="例如：阿凱" maxlength="10">
-          <div class="btn-row" style="margin-top:12px;">
-            <button class="btn btn-primary" id="btnCreateRoom">建立新房間</button>
-          </div>
-          <label style="margin-top:14px;">或輸入房間代碼加入</label>
-          <div class="btn-row">
-            <input type="text" id="roomCodeInput" placeholder="6碼房間代碼" maxlength="6" style="text-transform:uppercase;">
-            <button class="btn btn-outline" id="btnJoinRoom" style="width:auto; flex:0 0 auto; padding:12px 18px;">加入</button>
-          </div>
-          <div id="roomStatus" class="status-line status-wait" style="display:none;"></div>
-        </div>
-
-        <div id="roomJoinedBlock" style="display:none;">
-          <label>房間代碼（分享給隊友）</label>
-          <div class="status-line status-ok" id="roomCodeDisplay" style="font-size:16px; font-weight:800; letter-spacing:2px; justify-content:center;"></div>
-          <label style="margin-top:14px;">成員（<span id="memberCount">0</span>/5）</label>
-          <div class="member-list" id="memberList"></div>
-          <button class="btn btn-danger" id="btnLeaveRoom" style="margin-top:14px;">離開房間</button>
-        </div>
-      </div>
+      <!-- 房間資訊會在加入房間後從登入畫面搬移到這裡 -->
+      <div id="roomCardMount"></div>
 
       <!-- 音樂歌單（進入房間後才顯示） -->
       <div class="card" id="musicCard" style="display:none;">
@@ -272,16 +263,19 @@
   <!-- ============ 底部 TAB BAR ============ -->
   <div class="tabbar">
     <button class="tabbtn active" data-tab="settings">
-      <span class="icon">🎮</span><span>遊戲</span>
+      <span>遊戲</span>
     </button>
     <button class="tabbtn" data-tab="messages">
-      <span class="icon">💬</span><span>訊息</span>
+      <span>訊息</span>
     </button>
     <button class="tabbtn" data-tab="charlog">
-      <span class="icon">📝</span><span>紀錄</span>
+      <span>紀錄</span>
+    </button>
+    <button class="tabbtn" data-tab="info">
+      <span>說明</span>
     </button>
     <button class="tabbtn" data-tab="config">
-      <span class="icon">⚙️</span><span>設定</span>
+      <span>設定</span>
     </button>
   </div>
 
