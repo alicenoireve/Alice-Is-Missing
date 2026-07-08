@@ -68,12 +68,13 @@ body{
 
 /* ===== Tab bar (bottom) ===== */
 .tabbar{
-  display:flex;
+  display:none;
   border-top:1px solid var(--line);
   background:#fff;
   flex-shrink:0;
   padding-bottom:var(--safe-bottom);
 }
+.tabbar.show{ display:flex; }
 .tabbtn{
   flex:1;
   border:none;
@@ -89,6 +90,13 @@ body{
 }
 .tabbtn .icon{font-size:20px; line-height:1;}
 .tabbtn.active{color:var(--accent-dark); font-weight:700;}
+
+/* ===== 登入畫面 ===== */
+#loginScreen{
+  flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  background:#f4f6f5;
+}
+#loginScreen.hide{ display:none; }
 
 /* ===== Views ===== */
 .view{display:none; flex:1; min-height:0; flex-direction:column; position:relative;}
@@ -299,6 +307,26 @@ summary{font-size:13px; color:var(--accent-dark); cursor:pointer; padding:4px 0;
 }
 .charlog-role-opt.picked{ border-color:var(--accent); background:var(--accent-soft); color:var(--accent-dark); font-weight:700; }
 .charlog-role-tag{ font-size:14px; font-weight:800; margin:0 2px 10px; }
+
+/* ===== 海報卡片(HTML重建版) ===== */
+.poster-card{
+  background:#e9e8e6; border:2px solid #2a2a2a; border-radius:2px;
+  padding:14px 12px 16px; max-width:320px; margin:0 auto;
+  box-shadow:0 2px 10px rgba(0,0,0,.15);
+}
+.poster-title{
+  font-family:'Anton', sans-serif; font-size:30px; text-align:center; letter-spacing:1px;
+  color:#2a2a2a; margin:2px 0 10px; text-transform:uppercase;
+}
+.poster-photo-frame{
+  border:3px solid #2a2a2a; overflow:hidden; margin-bottom:10px; background:#000;
+}
+.poster-photo-frame img{ width:100%; display:block; }
+.poster-divider{ height:2px; background:#2a2a2a; margin:8px 0 10px; }
+.poster-info-row{ display:flex; gap:8px; }
+.poster-info-col{ flex:1; font-family:'Anton', sans-serif; font-size:13px; line-height:1.7; color:#2a2a2a; }
+.poster-info-col.right{ text-align:center; }
+.poster-info-col b{ font-weight:400; }
 
 /* ===== 指派表格（assign 階段） ===== */
 .assign-table{ display:flex; flex-direction:column; gap:8px; margin-top:12px; }

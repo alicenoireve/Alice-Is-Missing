@@ -196,6 +196,15 @@ $("btnLeaveRoom").addEventListener("click", async ()=>{
   $("roomPill").textContent = "尚未加入房間";
   $("msgGate").style.display = "flex";
   $("msgContent").style.display = "none";
+
+  // 把房間卡片搬回登入畫面，顯示登入畫面、隱藏分頁列
+  const loginScroll = document.querySelector("#loginScreen .settings-scroll");
+  if(loginScroll) loginScroll.appendChild($("roomCard"));
+  $("loginScreen").classList.remove("hide");
+  $("tabbar").classList.remove("show");
+  document.querySelectorAll(".tabbtn").forEach(b=>b.classList.remove("active"));
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+
   if(window.GameModule) window.GameModule.onRoomLeave();
   showRoomStatus("wait","已離開房間");
 });
@@ -227,6 +236,16 @@ function enterRoom(roomId, memberId, name){
   $("musicCard").style.display = "block";
   $("msgGate").style.display = "none";
   $("msgContent").style.display = "flex";
+
+  // 隱藏登入畫面，顯示分頁列，把房間卡片搬到「設定」分頁供之後查看/離開房間
+  $("loginScreen").classList.add("hide");
+  $("tabbar").classList.add("show");
+  const mount = $("roomCardMount");
+  if(mount) mount.appendChild($("roomCard"));
+  document.querySelectorAll(".tabbtn").forEach(b=>b.classList.remove("active"));
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  document.querySelector('.tabbtn[data-tab="settings"]').classList.add("active");
+  $("view-settings").classList.add("active");
 
   attachMembers();
   attachTimer();

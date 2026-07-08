@@ -61,6 +61,41 @@ const SHARED_POOLS = {
 };
 
 const FINAL_POOL = ["S12-4","S12-5","S12-6"];
+
+const POSTER_STATS = {
+  1: {height:'165.1',weight:'50.8',hair:'黑色',eye:'淡褐色'},
+  2: {height:'167.6',weight:'54.4',hair:'黑色',eye:'棕色'},
+  3: {height:'160.0',weight:'83.9',hair:'棕色',eye:'綠色'},
+  4: {height:'162.6',weight:'53.1',hair:'銅色',eye:'藍色'},
+  5: {height:'170.2',weight:'54.4',hair:'黑色',eye:'淡褐色'},
+  6: {height:'157.5',weight:'59.0',hair:'黑色/粉色',eye:'綠色'},
+  7: {height:'162.6',weight:'49.0',hair:'黑色',eye:'棕色'},
+  8: {height:'165.1',weight:'49.9',hair:'黑色',eye:'淡褐色'},
+  9: {height:'172.7',weight:'58.1',hair:'棕色',eye:'淡褐色'},
+  10:{height:'160.0',weight:'52.2',hair:'金色',eye:'藍色'},
+};
+
+function renderPosterCard(idx){
+  const s = POSTER_STATS[idx];
+  if(!s) return "";
+  return `
+    <div class="poster-card">
+      <div class="poster-title">Missing Person</div>
+      <div class="poster-photo-frame"><img src="assets/posters/photo${idx}.jpg" alt="海報 ${idx}"></div>
+      <div class="poster-divider"></div>
+      <div class="poster-info-row">
+        <div class="poster-info-col">
+          身高：${s.height}<br>
+          體重：${s.weight}<br>
+          頭髮：${s.hair}<br>
+          瞳色：${s.eye}
+        </div>
+        <div class="poster-info-col right">
+          若有任何線索<br>請撥打<br><b>(530) 207-0361</b>
+        </div>
+      </div>
+    </div>`;
+}
 const COIN_TEXT = {
   "S12-5": { heads:"你成功逃脫", tails:"你沒能逃脫，停止傳送簡訊" },
   "S12-6": { heads:"你們兩人找到逃生的方法", tails:"愛麗絲逃脫，但你前來救他的角色沒有" }
@@ -248,9 +283,9 @@ function renderPhaseAction(){
     let html = `
       <p class="help-text" style="margin-top:10px; font-size:15px; font-weight:700; color:var(--ink);">請選擇愛麗絲的失蹤海報：</p>
       <p class="help-text" style="margin-top:0;">${isPicker? "輪到你選擇，用左右按鈕瀏覽，選好後按下方「下一步」即可鎖定。" : `由 <b>${pickerName}</b> 負責選擇，你只需要等待並按「下一步」。`}</p>
-      <div class="intro-card-wrap" style="display:block;">
-        <img src="assets/posters/poster${idx}.jpg" alt="海報 ${idx}">
-        <div class="cap" style="margin-top:6px;">海報 ${idx} / 10</div>
+      <div style="padding:6px 0;">
+        ${renderPosterCard(idx)}
+        <div class="cap" style="text-align:center; margin-top:8px;">海報 ${idx} / 10</div>
       </div>`;
     if(isPicker){
       html += `<div class="btn-row" style="margin-top:10px;">
@@ -882,17 +917,33 @@ async function exportCharLogHtml(roleCode){
   const motiveCode = game ? (game.motiveAssign||{})[state.memberId] : null;
   const myName = escapeHtml((state.members[state.memberId]||{}).name || "");
   const posterIdx = game ? game.posterSelected : null;
-  const posterB64 = posterIdx ? await imgToBase64(`assets/posters/poster${posterIdx}.jpg`) : null;
+  const posterPhotoB64 = posterIdx ? await imgToBase64(`assets/posters/photo${posterIdx}.jpg`) : null;
+  const posterStats = posterIdx ? POSTER_STATS[posterIdx] : null;
 
   const locRows = LOCATION_LIST.map((loc,i)=>`
     <div class="item"><div class="iname">${escapeHtml(loc)}</div><div class="inote">${escapeHtml(data.locNotes?.[i]||"（無筆記）")}</div></div>`).join("");
   const pplRows = PEOPLE_LIST.map((p,i)=>`
     <div class="item"><div class="iname">${escapeHtml(p)}</div><div class="inote">${escapeHtml(data.peopleNotes?.[i]||"（無筆記）")}</div></div>`).join("");
 
+  const posterSection = (posterPhotoB64 && posterStats) ? `
+  <section>
+    <h2>愛麗絲的失蹤海報</h2>
+    <div class="poster-card" style="background:#e9e8e6;border:2px solid #2a2a2a;padding:14px 12px 16px;max-width:280px;margin:0 auto;">
+      <div style="font-family:'Anton',sans-serif;font-size:26px;text-align:center;letter-spacing:1px;color:#2a2a2a;margin:2px 0 10px;text-transform:uppercase;">Missing Person</div>
+      <div style="border:3px solid #2a2a2a;overflow:hidden;margin-bottom:10px;"><img src="${posterPhotoB64}" style="width:100%;display:block;"></div>
+      <div style="height:2px;background:#2a2a2a;margin:8px 0 10px;"></div>
+      <div style="display:flex;gap:8px;font-family:'Anton',sans-serif;font-size:12px;line-height:1.7;color:#2a2a2a;">
+        <div style="flex:1;">身高：${posterStats.height}<br>體重：${posterStats.weight}<br>頭髮：${posterStats.hair}<br>瞳色：${posterStats.eye}</div>
+        <div style="flex:1;text-align:center;">若有任何線索<br>請撥打<br>(530) 207-0361</div>
+      </div>
+    </div>
+  </section>` : "";
+
   return `<!DOCTYPE html>
 <html lang="zh-Hant"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>角色紀錄</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&display=swap" rel="stylesheet">
 <style>
   body{font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",sans-serif; background:#f4f2f0; color:#1c1420; margin:0; padding:20px;}
   .wrap{max-width:680px; margin:0 auto;}
@@ -914,7 +965,7 @@ async function exportCharLogHtml(roleCode){
     <h1>📝 角色紀錄</h1>
     <div class="sub">玩家：${myName}　角色：${escapeHtml(roleName)}　動機：${motiveCode||"（尚未抽取）"}　匯出時間：${new Date().toLocaleString()}</div>
   </header>
-  ${posterB64 ? `<section><h2>愛麗絲的失蹤海報</h2><img src="${posterB64}" style="max-width:280px;display:block;margin:0 auto;border-radius:8px;"></section>` : ""}
+  ${posterSection}
   <section>
     <h2>我的秘密</h2>
     <div class="secret">${escapeHtml(data.secret||"（尚未填寫）")}</div>
@@ -977,9 +1028,7 @@ function mountCharLog(mount, roleCode){
 
   if(posterIdx){
     html += `<div class="charlog-sub" style="margin-top:0;">愛麗絲的失蹤海報</div>
-      <div class="intro-card-wrap" style="display:block; padding:4px 0 10px;">
-        <img src="assets/posters/poster${posterIdx}.jpg" alt="海報 ${posterIdx}">
-      </div>`;
+      <div style="padding:4px 0 10px;">${renderPosterCard(posterIdx)}</div>`;
   }
 
   html += `<div class="charlog-sub" style="margin-top:0;">你的角色</div>`;

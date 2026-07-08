@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
 <title>Alice Is Missing - A Silent Role Playing Game</title>
 <link rel="stylesheet" href="styles.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&display=swap" rel="stylesheet">
 </head>
 <body>
 <div id="app">
@@ -15,8 +18,69 @@
     <div class="room-pill" id="roomPill">尚未加入房間</div>
   </div>
 
+  <!-- ============ 登入畫面（尚未加入房間時顯示，這裡沒有分頁列） ============ -->
+  <div id="loginScreen">
+    <div class="settings-scroll">
+
+      <div class="hero-title">
+        <h1>Alice Is Missing</h1>
+        <div class="sub">A SILENT ROLE PLAYING GAME</div>
+      </div>
+
+      <!-- 連線設定 -->
+      <div class="card" id="fbCard">
+        <h2><span class="num">1</span>連線設定（每台裝置只需設定一次）</h2>
+        <details id="fbDetails">
+          <summary>展開 Firebase 連線設定</summary>
+          <p class="help-text">
+            這個聊天室要多人跨裝置同步，需要一個免費的 Firebase 即時資料庫來當「訊息中繼站」，網站本身仍是純靜態頁面，可放心部署到 GitHub Pages。
+            <ol>
+              <li>前往 <a href="https://console.firebase.google.com" target="_blank">Firebase Console</a> 建立新專案（免費）</li>
+              <li>左側選單啟用「Realtime Database」，測試模式建立</li>
+              <li>專案設定 →新增「網頁應用程式」→ 複製 firebaseConfig 物件</li>
+              <li>整段貼到下方欄位即可</li>
+            </ol>
+          </p>
+          <label>貼上 firebaseConfig（直接從 Firebase 主控台複製整段貼上即可，不用自己改格式）</label>
+          <textarea id="fbConfigInput" placeholder='const firebaseConfig = {&#10;  apiKey: "...",&#10;  authDomain: "...",&#10;  databaseURL: "https://xxx.firebasedatabase.app",&#10;  projectId: "..."&#10;};'></textarea>
+          <div class="btn-row" style="margin-top:10px;">
+            <button class="btn btn-primary" id="btnSaveFb">儲存並連線</button>
+          </div>
+          <div id="fbStatus" class="status-line status-wait">尚未連線</div>
+        </details>
+      </div>
+
+      <!-- 房間 -->
+      <div class="card" id="roomCard">
+        <h2><span class="num">2</span>房間</h2>
+        <div id="roomJoinBlock">
+          <label>你的暱稱</label>
+          <input type="text" id="nicknameInput" placeholder="例如：阿凱" maxlength="10">
+          <div class="btn-row" style="margin-top:12px;">
+            <button class="btn btn-primary" id="btnCreateRoom">建立新房間</button>
+          </div>
+          <label style="margin-top:14px;">或輸入房間代碼加入</label>
+          <div class="btn-row">
+            <input type="text" id="roomCodeInput" placeholder="6碼房間代碼" maxlength="6" style="text-transform:uppercase;">
+            <button class="btn btn-outline" id="btnJoinRoom" style="width:auto; flex:0 0 auto; padding:12px 18px;">加入</button>
+          </div>
+          <div id="roomStatus" class="status-line status-wait" style="display:none;"></div>
+        </div>
+
+        <div id="roomJoinedBlock" style="display:none;">
+          <label>房間代碼（分享給隊友）</label>
+          <div class="status-line status-ok" id="roomCodeDisplay" style="font-size:16px; font-weight:800; letter-spacing:2px; justify-content:center;"></div>
+          <label style="margin-top:14px;">成員（<span id="memberCount">0</span>/5）</label>
+          <div class="member-list" id="memberList"></div>
+          <button class="btn btn-danger" id="btnLeaveRoom" style="margin-top:14px;">離開房間</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <!-- ============ 遊戲 TAB ============ -->
-  <div class="view active" id="view-settings">
+  <div class="view" id="view-settings">
     <div class="settings-scroll">
 
       <!-- 3. 遊戲面板 -->
@@ -261,21 +325,21 @@
   <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 
   <!-- ============ 底部 TAB BAR ============ -->
-  <div class="tabbar">
+  <div class="tabbar" id="tabbar">
     <button class="tabbtn active" data-tab="settings">
-      <span>遊戲</span>
+      <span class="icon">🂠</span><span>遊戲</span>
     </button>
     <button class="tabbtn" data-tab="messages">
-      <span>訊息</span>
+      <span class="icon">✉</span><span>訊息</span>
     </button>
     <button class="tabbtn" data-tab="charlog">
-      <span>紀錄</span>
+      <span class="icon">✎</span><span>紀錄</span>
     </button>
     <button class="tabbtn" data-tab="info">
-      <span>說明</span>
+      <span class="icon">ℹ</span><span>說明</span>
     </button>
     <button class="tabbtn" data-tab="config">
-      <span>設定</span>
+      <span class="icon">⚙</span><span>設定</span>
     </button>
   </div>
 
