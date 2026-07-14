@@ -450,12 +450,25 @@ function sendMessage(){
 }
 
 /* ---------- Timer ---------- */
+let lastTimerRunningForMusic = null;
 function attachTimer(){
   timerRef = db.ref(`rooms/${state.roomId}/timer`);
   timerRef.on("value", snap=>{
     const v = snap.val();
     if(v) state.timer = v;
     updateTimerUI();
+
+    // 音樂跟著計時狀態走：所有裝置各自的播放器都在計時開始時播放、計時重置/未開始時暫停
+    const running = !!(state.timer && state.timer.running);
+    if(running !== lastTimerRunningForMusic){
+      lastTimerRunningForMusic = running;
+      if(running){
+        if(window.spotifyController){ try{ window.spotifyController.play(); }catch(e){} }
+        else if(window.createSpotifyPlayerIfNeeded){ window.createSpotifyPlayerIfNeeded(); }
+      } else if(window.spotifyController){
+        try{ window.spotifyController.pause(); }catch(e){}
+      }
+    }
   });
 }
 function startGameTimer(){
@@ -465,9 +478,6 @@ function startGameTimer(){
     running: true,
     duration: TIMER_DURATION_SEC
   });
-  if(window.spotifyController){
-    try{ window.spotifyController.play(); }catch(e){}
-  }
 }
 
 

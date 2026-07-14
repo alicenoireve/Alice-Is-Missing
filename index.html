@@ -300,25 +300,33 @@
       <!-- 房間資訊會在加入房間後從登入畫面搬移到這裡 -->
       <div id="roomCardMount"></div>
 
-      <!-- 音樂歌單（進入房間後才顯示） -->
+      <!-- 音樂歌單（進入房間後才顯示，計時開始才會真正載入/播放） -->
       <div class="card" id="musicCard" style="display:none;">
         <h2><span class="num">🎵</span>配樂</h2>
-        <div id="spotifyEmbedWrap" style="border-radius:12px; overflow:hidden; height:152px; max-height:152px;">
-          <iframe id="spotifyIframe" style="border-radius:12px; display:block;" src="https://open.spotify.com/embed/playlist/71Qpjf8iYioDNqwWCBzRgr?utm_source=generator&theme=0"
-            width="100%" height="152" frameborder="0"
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
-        </div>
+        <div id="musicPlaceholder" class="stub-section">⏳ 開始計時後會自動載入並播放（音量／靜音可以用播放器本身右下角的圖示調整）</div>
+        <div id="spotifyEmbedWrap" style="border-radius:12px; overflow:hidden; display:none;"></div>
       </div>
 
     </div>
   </div>
 
   <script>
+    window.spotifyApiReady = false;
     window.onSpotifyIframeApiReady = (IFrameAPI) => {
+      window._SpotifyIFrameAPI = IFrameAPI;
+      window.spotifyApiReady = true;
+    };
+    window.createSpotifyPlayerIfNeeded = function(){
+      if(window.spotifyController || !window.spotifyApiReady) return;
       const element = document.getElementById('spotifyEmbedWrap');
-      const options = { width:'100%', height:'152', uri:'spotify:playlist:71Qpjf8iYioDNqwWCBzRgr' };
-      IFrameAPI.createController(element, options, (EmbedController) => {
+      if(!element) return;
+      const options = { width:'100%', height:'352', uri:'spotify:playlist:71Qpjf8iYioDNqwWCBzRgr' };
+      window._SpotifyIFrameAPI.createController(element, options, (EmbedController) => {
         window.spotifyController = EmbedController;
+        const ph = document.getElementById('musicPlaceholder');
+        if(ph) ph.style.display = 'none';
+        element.style.display = 'block';
+        EmbedController.play();
       });
     };
   </script>

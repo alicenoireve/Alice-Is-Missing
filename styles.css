@@ -318,6 +318,14 @@ summary{font-size:13px; color:var(--accent-dark); cursor:pointer; padding:4px 0;
   font-family:'Anton', sans-serif; font-size:30px; text-align:center; letter-spacing:1px;
   color:#2a2a2a; margin:2px 0 10px; text-transform:uppercase;
 }
+.poster-name{
+  font-family:'Anton', sans-serif; font-size:15px; text-align:center; letter-spacing:.5px;
+  color:#2a2a2a; margin:2px 0 0;
+}
+.poster-missing-since{
+  font-family:'Anton', sans-serif; font-size:11px; text-align:center; letter-spacing:.5px;
+  color:#2a2a2a; margin:2px 0 8px;
+}
 .poster-photo-frame{
   border:3px solid #2a2a2a; overflow:hidden; margin-bottom:10px; background:#000;
 }
