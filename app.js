@@ -193,6 +193,7 @@ $("btnLeaveRoom").addEventListener("click", async ()=>{
   $("roomJoinBlock").style.display = "block";
   $("gamePanel").style.display = "none";
   $("musicCard").style.display = "none";
+  $("musicDock").style.display = "none";
   $("roomPill").textContent = "尚未加入房間";
   $("msgGate").style.display = "flex";
   $("msgContent").style.display = "none";
@@ -234,6 +235,7 @@ function enterRoom(roomId, memberId, name){
   $("roomPill").textContent = roomId;
   $("gamePanel").style.display = "flex";
   $("musicCard").style.display = "block";
+  $("musicDock").style.display = "block";
   $("msgGate").style.display = "none";
   $("msgContent").style.display = "flex";
 
@@ -252,7 +254,65 @@ function enterRoom(roomId, memberId, name){
   switchChannel("group");
   startTicker();
   if(window.GameModule) window.GameModule.onRoomEnter();
+  updateAvatarPreview();
 }
+
+/* ---------- 大頭貼上傳 ---------- */
+function updateAvatarPreview(){
+  const preview = $("avatarPreview");
+  if(!preview) return;
+  const m = state.members[state.memberId];
+  if(m && m.avatar){
+    preview.innerHTML = `<img src="${m.avatar}" alt="">`;
+  } else {
+    preview.innerHTML = "📷";
+  }
+}
+
+function compressImageToDataUrl(file, maxSize){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w = img.width, h = img.height;
+        if(w > h){ if(w > maxSize){ h = Math.round(h*maxSize/w); w = maxSize; } }
+        else { if(h > maxSize){ w = Math.round(w*maxSize/h); h = maxSize; } }
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.75));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+$("btnPickAvatar").addEventListener("click", ()=>{
+  $("avatarFileInput").click();
+});
+$("avatarFileInput").addEventListener("change", async (e)=>{
+  const file = e.target.files[0];
+  if(!file || !state.roomId) return;
+  try{
+    toast("處理圖片中…");
+    const dataUrl = await compressImageToDataUrl(file, 200); // 200px夠頭像用，控制資料大小
+    await db.ref(`rooms/${state.roomId}/members/${state.memberId}/avatar`).set(dataUrl);
+    toast("大頭貼已更新");
+  }catch(err){
+    toast("圖片處理失敗："+err.message);
+  }
+  e.target.value = "";
+});
+$("btnClearAvatar").addEventListener("click", async ()=>{
+  if(!state.roomId) return;
+  await db.ref(`rooms/${state.roomId}/members/${state.memberId}/avatar`).remove();
+  toast("已清除大頭貼");
+});
 
 /* ---------- Members ---------- */
 function attachMembers(){
@@ -261,9 +321,18 @@ function attachMembers(){
     state.members = snap.val() || {};
     renderMembers();
     renderChannelStrip();
+    updateAvatarPreview();
     if(window.GameModule) window.GameModule.onMembersChanged();
   });
 }
+function avatarInnerHtml(id){
+  const m = state.members[id] || {};
+  if(m.avatar){
+    return `<img src="${m.avatar}" alt="">`;
+  }
+  return escapeHtml((m.name||"?")[0]);
+}
+
 function renderMembers(){
   const list = $("memberList");
   list.innerHTML = "";
@@ -274,7 +343,7 @@ function renderMembers(){
     const row = document.createElement("div");
     row.className = "member-row";
     row.innerHTML = `
-      <div class="avatar" style="background:${colorFor(id)}">${escapeHtml((m.name||"?")[0])}</div>
+      <div class="avatar" style="background:${colorFor(id)}">${avatarInnerHtml(id)}</div>
       <div class="name">${escapeHtml(m.name||"未命名")}</div>
       ${id===state.memberId ? '<span class="you-tag">你</span>' : ''}
     `;
@@ -296,7 +365,11 @@ function renderChannelStrip(){
     const avatar = document.createElement("div");
     avatar.className = "dm-avatar";
     avatar.style.background = colorFor(id);
-    avatar.textContent = (displayName||"?")[0];
+    if(m.avatar){
+      avatar.innerHTML = `<img src="${m.avatar}" alt="">`;
+    } else {
+      avatar.textContent = (displayName||"?")[0];
+    }
     item.insertBefore(avatar, item.firstChild);
     list.appendChild(item);
   });
@@ -378,9 +451,11 @@ function renderMessages(msgsObj){
     if(compact){
       html += `<div class="msg-row compact"><div class="msg-text">${escapeHtml(msg.text||"")}</div></div>`;
     } else {
+      const showAvatarImg = state.currentChannel !== "ooc" && state.members[msg.sender] && state.members[msg.sender].avatar;
+      const avatarInner = showAvatarImg ? `<img src="${state.members[msg.sender].avatar}" alt="">` : escapeHtml((msg.senderName||"?")[0]);
       html += `
         <div class="msg-row">
-          <div class="msg-avatar" style="background:${colorFor(msg.sender)}">${escapeHtml((msg.senderName||"?")[0])}</div>
+          <div class="msg-avatar" style="background:${colorFor(msg.sender)}">${avatarInner}</div>
           <div class="msg-body">
             <div class="msg-headline">
               <span class="sender ${isMe?'me':''}">${escapeHtml(msg.senderName||"")}</span>

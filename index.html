@@ -70,6 +70,17 @@
         <div id="roomJoinedBlock" style="display:none;">
           <label>房間代碼（分享給隊友）</label>
           <div class="status-line status-ok" id="roomCodeDisplay" style="font-size:16px; font-weight:800; letter-spacing:2px; justify-content:center;"></div>
+
+          <label style="margin-top:14px;">我的大頭貼（選填，房間關閉就會清除）</label>
+          <div class="avatar-upload-row">
+            <div class="avatar-upload-preview" id="avatarPreview">📷</div>
+            <div class="avatar-upload-btns">
+              <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
+              <button class="btn btn-outline" id="btnPickAvatar" style="width:auto; padding:8px 14px; font-size:13px;">選擇圖片</button>
+              <button class="btn btn-ghost" id="btnClearAvatar" style="width:auto; padding:8px 14px; font-size:13px;">清除</button>
+            </div>
+          </div>
+
           <label style="margin-top:14px;">成員（<span id="memberCount">0</span>/5）</label>
           <div class="member-list" id="memberList"></div>
           <button class="btn btn-danger" id="btnLeaveRoom" style="margin-top:14px;">離開房間</button>
@@ -300,14 +311,19 @@
       <!-- 房間資訊會在加入房間後從登入畫面搬移到這裡 -->
       <div id="roomCardMount"></div>
 
-      <!-- 音樂歌單（進入房間後才顯示，計時開始才會真正載入/播放） -->
+      <!-- 音樂歌單控制：實際播放器已移到跨分頁常駐區塊(見下方 #musicDock)，這裡只留說明 -->
       <div class="card" id="musicCard" style="display:none;">
         <h2><span class="num">🎵</span>配樂</h2>
-        <div id="musicPlaceholder" class="stub-section">⏳ 開始計時後會自動載入並播放（音量／靜音可以用播放器本身右下角的圖示調整）</div>
-        <div id="spotifyEmbedWrap" style="border-radius:12px; overflow:hidden; display:none;"></div>
+        <div class="help-text" style="margin:0;">播放器在最下方分頁列上方，切換頁籤時也會繼續播放，可以在那裡調整靜音／音量。</div>
       </div>
 
     </div>
+  </div>
+
+  <!-- 跨分頁常駐音樂列：故意放在.view系統外面，這樣切分頁的display:none不會影響到它，音樂才能一直播放 -->
+  <div id="musicDock" style="display:none;">
+    <div id="musicPlaceholder" class="music-dock-placeholder">⏳ 開始計時後會自動播放</div>
+    <div id="spotifyEmbedWrap" style="display:none;"></div>
   </div>
 
   <script>
@@ -320,7 +336,7 @@
       if(window.spotifyController || !window.spotifyApiReady) return;
       const element = document.getElementById('spotifyEmbedWrap');
       if(!element) return;
-      const options = { width:'100%', height:'352', uri:'spotify:playlist:71Qpjf8iYioDNqwWCBzRgr' };
+      const options = { width:'100%', height:'152', uri:'spotify:playlist:71Qpjf8iYioDNqwWCBzRgr' };
       window._SpotifyIFrameAPI.createController(element, options, (EmbedController) => {
         window.spotifyController = EmbedController;
         const ph = document.getElementById('musicPlaceholder');

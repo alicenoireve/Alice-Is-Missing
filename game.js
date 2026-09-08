@@ -1,6 +1,20 @@
 /* =========================================================
    game.js — Alice Is Missing 遊戲面板邏輯
    依附在 app.js 之後載入，共用其 state / db / $ / toast 等全域函式
+
+   【目錄】改東西前先看這裡，直接搜尋這些註解標籤定位：
+   §DATA      - 常數資料表（角色/動機/地點/嫌犯/計時卡/海報/階段）約 L9-159
+   §LIFECYCLE - 進出房間、初始狀態 約 L162-201
+   §RECORD    - 錄音/播放控制 約 L204-280
+   §RENDER-PHASE - renderPhaseAction()：各階段的行動區塊(海報/角色/地點/嫌犯/劇情卡...) 約 L292-555
+   §RENDER-MAIN  - render()：主渲染流程 約 L556-625
+   §RENDER-PLAYER- renderPlayerBlocks() 約 L626-675
+   §RENDER-SHARED- renderSharedArea()：地點/嫌犯/線索/結論欄 約 L685-845
+   §ADVANCE   - tryAdvancePhase()：階段推進判斷 約 L884-973
+   §AUTOASSIGN- autoDistributeTimerSlots() 約 L974-1042
+   §CHARLOG   - 角色紀錄本機儲存/匯出/掛載 約 L1043-1337
+   §EVENTS    - 事件委派 document.addEventListener("click"...) 搜尋 `if(action ===`
+   §DUECHECK  - startDueChecker()：計時提醒 約 L1338+
    ========================================================= */
 
 (function(){
@@ -39,6 +53,9 @@ const ROLE_COLORS = {
   "S07-4": "#8e44ad", // 朱莉亞．諾斯
   "S07-5": "#b8860b", // 埃文．霍威爾
 };
+const ROLE_CSS_CLASS = {
+  "S07-1": "role-c1", "S07-2": "role-c2", "S07-3": "role-c3", "S07-4": "role-c4", "S07-5": "role-c5",
+};
 const MOTIVE_POOL = ["S06-2","S06-3","S06-4","S06-5","S06-6"];
 
 // 動機對應的兩句「關係語句」模板，"你"="對象"、"我"="自己"，會依據誰選了誰再轉換成雙方視角
@@ -46,8 +63,8 @@ const MOTIVE_RELATIONSHIP_TEMPLATES = {
   "S06-2": ["我知道你對愛麗絲的真實看法。", "我們一直處不來。"],
   "S06-3": ["我們曾經是最好的朋友。", "你知道某個我不希望被分享出去的秘密。"],
   "S06-4": ["你總是在身邊支持我。", "愛麗絲已經因為某件事原諒了你，但我還沒。"],
-  "S06-5": ["我覺得你不喜歡我。", "我一直很想和你做朋友"],
-  "S06-6": ["我對你很有保護欲。", "我知道你並不像我一樣在乎愛麗絲"],
+  "S06-5": ["我覺得你不喜歡我。", "我一直很想和你做朋友。"],
+  "S06-6": ["我對你很有保護欲。", "我知道你並不像我一樣在乎愛麗絲。"],
 };
 
 // 地點／嫌犯卡片：玩家各自認領、填寫細節
@@ -331,30 +348,37 @@ function renderPhaseAction(){
 
     let html = "";
 
-    // ① 角色
-    html += `<div class="block-section-label" style="margin-top:12px;">① 選擇角色</div>`;
-    if(myRole){
-      html += `<div class="slot-row"><div class="card-slot large"><img src="${cardImg(myRole,'face')}"><div class="cap" style="color:${ROLE_COLORS[myRole]};font-weight:700;">${ROLE_NAMES[myRole]}</div></div></div>`;
+    if(myRole && myMotive){
+      // 角色+動機都確定了，並排顯示
+      html += `<div class="block-section-label" style="margin-top:12px;">你的角色與動機</div>
+        <div class="slot-row">
+          <div class="card-slot large"><img src="${cardImg(myRole,'face')}"><div class="cap ${ROLE_CSS_CLASS[myRole]}" style="font-weight:700;">${ROLE_NAMES[myRole]}</div></div>
+          <div class="card-slot large"><img src="${cardImg(myMotive,'face')}"></div>
+        </div>`;
     } else {
-      const taken = new Set(Object.keys(game.roleAssign||{}));
-      html += `<div class="pick-row">`;
-      ROLE_CODES.forEach(code=>{
-        html += `<button class="pick-btn" ${taken.has(code)?"disabled":""} data-action="pick-role" data-code="${code}">${ROLE_NAMES[code]}</button>`;
-      });
-      html += `</div>`;
-    }
+      // ① 角色
+      html += `<div class="block-section-label" style="margin-top:12px;">① 選擇角色</div>`;
+      if(myRole){
+        html += `<div class="slot-row"><div class="card-slot large"><img src="${cardImg(myRole,'face')}"><div class="cap ${ROLE_CSS_CLASS[myRole]}" style="font-weight:700;">${ROLE_NAMES[myRole]}</div></div></div>`;
+      } else {
+        const taken = new Set(Object.keys(game.roleAssign||{}));
+        html += `<div class="pick-row">`;
+        ROLE_CODES.forEach(code=>{
+          html += `<button class="pick-btn" ${taken.has(code)?"disabled":""} data-action="pick-role" data-code="${code}">${ROLE_NAMES[code]}</button>`;
+        });
+        html += `</div>`;
+      }
 
-    // ② 動機
-    html += `<div class="block-section-label">② 抽取動機</div>`;
-    if(myMotive){
-      html += `<div class="slot-row"><div class="card-slot large"><img src="${cardImg(myMotive,'face')}"><div class="cap">${myMotive}</div></div></div>`;
-    } else if(!myRole){
-      html += `<div class="charlog-lock">🔒 請先選擇角色</div>`;
-    } else if(!allRolesAssigned){
-      html += `<div class="charlog-lock">🔒 等待所有玩家（${roleCount}/${memberIds.length}）選完角色</div>`;
-    } else {
+      // ② 動機
+      html += `<div class="block-section-label">② 抽取動機</div>`;
+      if(!myRole){
+        html += `<div class="charlog-lock">🔒 請先選擇角色</div>`;
+      } else if(!allRolesAssigned){
+        html += `<div class="charlog-lock">🔒 等待所有玩家（${roleCount}/${memberIds.length}）選完角色</div>`;
+      } else {
       html += `<div class="pick-row"><button class="small-btn" data-action="draw-motive">🎴 抽取動機</button></div>`;
     }
+    } // 結束「尚未同時擁有角色+動機」的 else 區塊
 
     // ③ 秘密 + ④ 分配關係（角色+動機都好了才出現）
     if(myRole && myMotive){
@@ -392,23 +416,24 @@ function renderPhaseAction(){
     const label = isLoc ? "地點" : "嫌犯";
     const claimedCount = Object.keys(claims).length;
 
-    let html = `<p class="help-text" style="margin-top:10px;">每位玩家可以認領一個或多個${label}卡，並填寫細節。全部 ${pool.length} 張都要有人認領，且同一張不能被兩個人認領（已認領：${claimedCount}/${pool.length}）。</p>`;
+    let html = `<p class="help-text" style="margin-top:10px;">每位玩家可以認領一個或多個${label}卡，並填寫細節，所有人都看得到。全部 ${pool.length} 張都要有人認領，且同一張不能被兩個人認領（已認領：${claimedCount}/${pool.length}）。</p>`;
 
     html += `<div class="draw-queue">`;
-    pool.forEach(code=>{
-      const ownerId = claims[code];
-      const mine = ownerId === state.memberId;
+    pool.forEach((code,idx)=>{
+      const claim = claims[code];
+      const ownerId = claim ? claim.owner : null;
+      const note = claim ? claim.note : "";
       html += `<div class="draw-row ${ownerId?'done':'active'}">
         <div class="draw-row-head">
-          <span class="draw-label">${code}</span>
+          <span class="draw-label">${label} ${idx+1}</span>
           <span class="draw-owner">${ownerId ? ((state.members[ownerId]||{}).name||"") : "尚未認領"}</span>
         </div>
         <div class="draw-result"><div class="card-slot large"><img src="${cardImg(code,'face')}"></div></div>`;
       if(!ownerId){
         html += `<textarea id="claimNote_${code}" placeholder="寫下這個${label}的細節…" style="margin-top:6px;"></textarea>
           <button class="small-btn" style="margin-top:6px;" data-action="claim-card" data-pool="${isLoc?'location':'suspect'}" data-code="${code}">認領並儲存</button>`;
-      } else if(mine){
-        html += `<div class="help-text" style="margin-top:6px; color:var(--accent-dark);">✅ 已認領，細節已存入你的「紀錄」頁籤</div>`;
+      } else {
+        html += `<div class="help-text" style="margin-top:6px; color:var(--ink);">${escapeHtml(note)}</div>`;
       }
       html += `</div>`;
     });
@@ -444,6 +469,7 @@ function renderPhaseAction(){
     const remainMin = (typeof remainingSeconds === "function") ? remainingSeconds()/60 : 999;
     const charlieId = (game.roleAssign||{})["S07-1"] || null;
     let html = `<div class="draw-queue">`;
+    let anyShown = false;
     TIMER_GROUPS.forEach(g=>{
       const ownerId = g.key==="S07-6" ? charlieId : (game.timerSlotAssign||{})[g.key];
       const ownerName = ownerId ? ((state.members[ownerId]||{}).name || ownerId) : "（尚未指派）";
@@ -451,34 +477,26 @@ function renderPhaseAction(){
       const drawn = drawState && drawState.drawn;
       const due = remainMin <= parseInt(g.label,10);
 
-      html += `<div class="draw-row ${drawn?'done':(due?'active':'upcoming')}">
+      if(!due && !drawn) return; // 還沒到時間的不預留位置，直接不顯示
+      anyShown = true;
+
+      html += `<div class="draw-row ${drawn?'done':'active'}">
         <div class="draw-row-head"><span class="draw-label">${g.label}</span><span class="draw-owner">${escapeHtml(ownerName)}</span></div>`;
 
       if(drawn){
         const canSee = ownerId === state.memberId;
         html += canSee
-          ? `<div class="draw-result"><div class="card-slot large"><img src="${cardImg(drawState.code,'face')}"><div class="cap">${drawState.code}</div></div></div>`
+          ? `<div class="draw-result"><div class="card-slot large"><img src="${cardImg(drawState.code,'face')}"></div></div>`
           : `<div class="draw-result"><div class="card-slot large placeholder">🔒</div><span class="cap">已抽取（僅 ${escapeHtml(ownerName)} 本人看得到）</span></div>`;
-      } else if(due && ownerId === state.memberId){
-        if(g.cards.length === 1){
-          html += `<button class="small-btn" data-action="draw-timer" data-group="${g.key}">抽取</button>`;
-        } else {
-          html += `<div class="choice-row">`;
-          g.cards.forEach((code,i)=>{
-            html += `<button class="choice-card" data-action="draw-timer-choice" data-group="${g.key}" data-code="${code}">
-              <img src="${cardImg(g.cards[0],'back')}"><span class="cap">選項 ${i+1}</span>
-            </button>`;
-          });
-          html += `</div>`;
-        }
-      } else if(due){
-        html += `<div class="charlog-lock">🔒 等待 ${escapeHtml(ownerName)} 抽取</div>`;
+      } else if(ownerId === state.memberId){
+        html += `<button class="small-btn" data-action="draw-timer" data-group="${g.key}">抽取</button>`;
       } else {
-        html += `<div class="charlog-lock">⏳ 尚未到時間</div>`;
+        html += `<div class="charlog-lock">🔒 等待 ${escapeHtml(ownerName)} 抽取</div>`;
       }
       html += `</div>`;
     });
     html += `</div>`;
+    if(!anyShown) html = `<p class="help-text" style="margin-top:10px;">⏳ 還沒有劇情卡到抽取時間</p>`;
     area.innerHTML = html;
     return;
   }
@@ -648,7 +666,7 @@ function renderPlayerBlocks(){
     let html = `
       <div class="player-block-head">
         <div class="avatar" style="background:${colorFor(mid)}">${escapeHtml((m.name||"?")[0])}</div>
-        <div class="pname">${escapeHtml(m.name||"未命名")}${roleName? ` · <span style="color:${ROLE_COLORS[roleCode]};">${roleName}</span>` : ""}</div>
+        <div class="pname">${escapeHtml(m.name||"未命名")}${roleName? ` · <span class="${ROLE_CSS_CLASS[roleCode]}">${roleName}</span>` : ""}</div>
         ${isYou? '<span class="you-tag">你</span>' : ''}
       </div>
     `;
@@ -722,7 +740,7 @@ function renderSharedArea(){
   const pileImg = $("btnDrawFinal") ? $("btnDrawFinal").querySelector("img") : null;
   if(fd.code){
     if(pileImg) pileImg.src = cardImg(fd.code,"back"); // 牌堆按鈕本身固定顯示牌背
-    let html = `<div class="revealed-card" style="display:inline-block;"><img src="${cardImg(fd.code,'face')}"><div class="cap" style="margin-top:2px;">${fd.code}</div></div>`;
+    let html = `<div class="revealed-card" style="display:inline-block;"><img src="${cardImg(fd.code,'face')}"></div>`;
     if(fd.text){
       html += `<div class="coin-quote"><span class="coin-tag">🪙 ${fd.coin==='heads'?'人頭':'數字'}</span>「${escapeHtml(fd.text)}」</div>`;
     }
@@ -770,13 +788,11 @@ document.addEventListener("click", e=>{
     const note = noteEl ? noteEl.value.trim() : "";
     if(!note){ toast("請先寫下細節再認領"); return; }
     const patch = {};
-    patch[`${pool==="location"?"locationClaims":"suspectClaims"}/${code}`] = state.memberId;
+    const base = pool==="location" ? "locationClaims" : "suspectClaims";
+    patch[`${base}/${code}/owner`] = state.memberId;
+    patch[`${base}/${code}/note`] = note;
     update(patch);
-    const d = loadCharLogData();
-    if(pool==="location"){ d.locationCardNotes = d.locationCardNotes||{}; d.locationCardNotes[code] = note; }
-    else { d.suspectCardNotes = d.suspectCardNotes||{}; d.suspectCardNotes[code] = note; }
-    saveCharLogData(d);
-    toast("已認領並儲存");
+    toast("已認領並儲存，所有人都看得到");
   }
 
   if(action === "assign-timer"){
@@ -1107,22 +1123,29 @@ async function exportCharLogHtml(roleCode){
     ? relLines.map(t=>`<div class="item"><div class="inote">${escapeHtml(t)}</div></div>`).join("")
     : `<div class="item"><div class="inote">（無）</div></div>`;
 
-  // 認領的地點/嫌犯卡（含圖片）
-  async function claimRows(claimsObj, notesKey){
-    const mine = game ? Object.keys(claimsObj||{}).filter(c=>claimsObj[c]===state.memberId) : [];
-    if(!mine.length) return `<div class="item"><div class="inote">（無）</div></div>`;
+  // 所有地點/嫌犯卡（全員都匯出，不只自己認領的）
+  async function claimRows(claimsObj, pool){
     const parts = [];
-    for(const code of mine){
+    for(let i=0;i<pool.length;i++){
+      const code = pool[i];
+      const c = (claimsObj||{})[code];
+      if(!c) continue;
       const b64 = await imgToBase64(`assets/cards/${code}_face.jpg`);
+      const ownerName = escapeHtml((state.members[c.owner]||{}).name||"");
       parts.push(`<div class="item" style="display:flex;gap:10px;align-items:flex-start;">
         ${b64?`<img src="${b64}" style="width:70px;border-radius:6px;flex-shrink:0;">`:""}
-        <div><div class="iname">${code}</div><div class="inote">${escapeHtml((data[notesKey]||{})[code]||"")}</div></div>
+        <div><div class="iname">第 ${i+1} 項（${ownerName}）</div><div class="inote">${escapeHtml(c.note||"")}</div></div>
       </div>`);
     }
-    return parts.join("");
+    return parts.length ? parts.join("") : `<div class="item"><div class="inote">（無）</div></div>`;
   }
-  const locRows = await claimRows(game?game.locationClaims:{}, "locationCardNotes");
-  const susRows = await claimRows(game?game.suspectClaims:{}, "suspectCardNotes");
+  const locRows = await claimRows(game?game.locationClaims:{}, LOCATION_CARDS);
+  const susRows = await claimRows(game?game.suspectClaims:{}, SUSPECT_CARDS);
+
+  const fixedLocRows = LOCATION_LIST.map((loc,i)=>`
+    <div class="item"><div class="iname">${escapeHtml(loc)}</div><div class="inote">${escapeHtml((data.locNotes||{})[i]||"（無筆記）")}</div></div>`).join("");
+  const fixedPplRows = PEOPLE_LIST.map((p,i)=>`
+    <div class="item"><div class="iname">${escapeHtml(p)}</div><div class="inote">${escapeHtml((data.peopleNotes||{})[i]||"（無筆記）")}</div></div>`).join("");
 
   const posterSection = (posterPhotoB64 && posterStats) ? `
   <section>
@@ -1172,15 +1195,23 @@ async function exportCharLogHtml(roleCode){
     <div class="secret">${escapeHtml(data.secret||"（尚未填寫）")}</div>
   </section>
   <section>
-    <h2>關係</h2>
+    <h2>關係（自動產生）</h2>
     ${relRows}
   </section>
   <section>
-    <h2>我認領的地點</h2>
+    <h2>地點筆記</h2>
+    ${fixedLocRows}
+  </section>
+  <section>
+    <h2>人物筆記</h2>
+    ${fixedPplRows}
+  </section>
+  <section>
+    <h2>已認領的地點卡（自動產生）</h2>
     ${locRows}
   </section>
   <section>
-    <h2>我認領的嫌犯</h2>
+    <h2>已認領的嫌犯卡（自動產生）</h2>
     ${susRows}
   </section>
   <footer>由密談室聊天網站匯出（此紀錄僅存在你自己的裝置上）</footer>
@@ -1239,19 +1270,19 @@ function mountCharLog(mount, roleCode){
     return;
   }
 
-  html += `<div class="charlog-sub" style="margin-top:0;">你的角色</div>`;
+  html += `<div class="charlog-sub" style="margin-top:0;">你的角色與動機</div>
+    <div class="slot-row">`;
   if(roleCode){
-    html += `<div class="slot-row"><div class="card-slot large"><img src="${cardImg(roleCode,'face')}"><div class="cap" style="color:${ROLE_COLORS[roleCode]}; font-weight:700;">${ROLE_NAMES[roleCode]}</div></div></div>`;
+    html += `<div class="card-slot large"><img src="${cardImg(roleCode,'face')}"><div class="cap ${ROLE_CSS_CLASS[roleCode]}" style="font-weight:700;">${ROLE_NAMES[roleCode]}</div></div>`;
   } else {
-    html += `<div class="charlog-lock">尚未選擇角色</div>`;
+    html += `<div class="card-slot large placeholder">?</div>`;
   }
-
-  html += `<div class="charlog-sub">你的動機</div>`;
   if(motiveCode){
-    html += `<div class="slot-row"><div class="card-slot large"><img src="${cardImg(motiveCode,'face')}"><div class="cap">${motiveCode}</div></div></div>`;
+    html += `<div class="card-slot large"><img src="${cardImg(motiveCode,'face')}"></div>`;
   } else {
-    html += `<div class="charlog-lock">尚未抽取動機</div>`;
+    html += `<div class="card-slot large placeholder">?</div>`;
   }
+  html += `</div>`;
 
   html += `<div class="charlog-sub">我的秘密</div>
     <textarea data-clfield="secret" placeholder="寫下你的秘密…">${escapeHtml(data.secret||"")}</textarea>`;
@@ -1288,29 +1319,47 @@ function mountCharLog(mount, roleCode){
   });
 
   if(outgoing.length || incoming.length){
-    html += `<div class="charlog-sub">關係</div>`;
+    html += `<div class="charlog-sub">關係（自動產生，僅供參考）</div>`;
     outgoing.forEach(t=> html += `<div class="charlog-item"><div class="inote">${escapeHtml(t)}</div></div>`);
     incoming.forEach(t=> html += `<div class="charlog-item"><div class="inote">${escapeHtml(t)}</div></div>`);
   }
 
-  // 認領的地點卡
-  const myLocs = Object.keys(game.locationClaims||{}).filter(c=>game.locationClaims[c]===state.memberId);
-  if(myLocs.length){
-    html += `<div class="charlog-sub">我認領的地點</div>`;
-    myLocs.forEach(code=>{
+  // 5 格人物、5 格地點：保留舊版可自由編輯的格式，玩家寫的內容永遠不會被覆蓋
+  html += `<div class="charlog-sub">地點（視需要填寫細節，可自行編輯）</div>`;
+  LOCATION_LIST.forEach((loc,i)=>{
+    html += `<div class="charlog-item"><div class="iname">${loc}</div>
+      <textarea data-clloc="${i}" placeholder="細節…">${escapeHtml((data.locNotes||{})[i]||"")}</textarea></div>`;
+  });
+  html += `<div class="charlog-sub">人物（視需要填寫細節，可自行編輯）</div>`;
+  PEOPLE_LIST.forEach((p,i)=>{
+    html += `<div class="charlog-item"><div class="iname">${p}</div>
+      <textarea data-clppl="${i}" placeholder="細節…">${escapeHtml((data.peopleNotes||{})[i]||"")}</textarea></div>`;
+  });
+
+  // 所有地點卡（全員都看得到，不只認領者自己）
+  const locClaims = game.locationClaims || {};
+  if(Object.keys(locClaims).length){
+    html += `<div class="charlog-sub">已認領的地點卡（自動產生，僅供參考）</div>`;
+    LOCATION_CARDS.forEach((code,idx)=>{
+      const c = locClaims[code];
+      if(!c) return;
       html += `<div class="charlog-item">
-        <div class="slot-row"><div class="card-slot"><img src="${cardImg(code,'face')}"><div class="cap">${code}</div></div></div>
-        <div class="inote">${escapeHtml((data.locationCardNotes||{})[code]||"")}</div></div>`;
+        <div class="iname">地點 ${idx+1}（${escapeHtml((state.members[c.owner]||{}).name||"")}）</div>
+        <div class="slot-row"><div class="card-slot large"><img src="${cardImg(code,'face')}"></div></div>
+        <div class="inote">${escapeHtml(c.note||"")}</div></div>`;
     });
   }
-  // 認領的嫌犯卡
-  const mySus = Object.keys(game.suspectClaims||{}).filter(c=>game.suspectClaims[c]===state.memberId);
-  if(mySus.length){
-    html += `<div class="charlog-sub">我認領的嫌犯</div>`;
-    mySus.forEach(code=>{
+  // 所有嫌犯卡
+  const susClaims = game.suspectClaims || {};
+  if(Object.keys(susClaims).length){
+    html += `<div class="charlog-sub">已認領的嫌犯卡（自動產生，僅供參考）</div>`;
+    SUSPECT_CARDS.forEach((code,idx)=>{
+      const c = susClaims[code];
+      if(!c) return;
       html += `<div class="charlog-item">
-        <div class="slot-row"><div class="card-slot"><img src="${cardImg(code,'face')}"><div class="cap">${code}</div></div></div>
-        <div class="inote">${escapeHtml((data.suspectCardNotes||{})[code]||"")}</div></div>`;
+        <div class="iname">嫌犯 ${idx+1}（${escapeHtml((state.members[c.owner]||{}).name||"")}）</div>
+        <div class="slot-row"><div class="card-slot large"><img src="${cardImg(code,'face')}"></div></div>
+        <div class="inote">${escapeHtml(c.note||"")}</div></div>`;
     });
   }
 
@@ -1354,6 +1403,12 @@ function checkDue(){
   });
   if(!(game.finalDraw && game.finalDraw.code) && remainMin <= 10) due = true;
   document.querySelectorAll(".timer-display, .timer-bar").forEach(el=>el.classList.toggle("due", due));
+
+  // 修正：劇情卡是否「到時間可以抽」是靠倒數計時算出來的，光靠Firebase資料變動不會觸發重畫，
+  // 所以這裡每秒都重新畫一次「現在階段」區塊，時間到了才不用重新整理就能看到可以抽卡
+  if(["live","playback","end"].includes(game.phase)){
+    renderPhaseAction();
+  }
 }
 
 function getDisplayName(memberId){
