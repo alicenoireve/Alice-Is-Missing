@@ -1143,29 +1143,24 @@ async function exportCharLogHtml(roleCode){
     ? relLines.map(t=>`<div class="item"><div class="inote">${escapeHtml(t)}</div></div>`).join("")
     : `<div class="item"><div class="inote">（無）</div></div>`;
 
-  // 所有地點/嫌犯卡（全員都匯出，不只自己認領的）
-  async function claimRows(claimsObj, pool){
+  // 地點/嫌犯：合併呈現，卡片圖＋細節（玩家自己編輯過的優先，否則用認領者寫的）
+  function mergedRows(nameList, pool, claimsObj, savedNotes){
     const parts = [];
-    for(let i=0;i<pool.length;i++){
+    for(let i=0;i<nameList.length;i++){
       const code = pool[i];
-      const c = (claimsObj||{})[code];
-      if(!c) continue;
-      const b64 = await imgToBase64(`assets/cards/${code}_face.jpg`);
-      const ownerName = escapeHtml((state.members[c.owner]||{}).name||"");
-      parts.push(`<div class="item" style="display:flex;gap:10px;align-items:flex-start;">
-        ${b64?`<img src="${b64}" style="width:70px;border-radius:6px;flex-shrink:0;">`:""}
-        <div><div class="iname">第 ${i+1} 項（${ownerName}）</div><div class="inote">${escapeHtml(c.note||"")}</div></div>
+      const c = code ? (claimsObj||{})[code] : null;
+      const saved = (savedNotes||{})[i];
+      const note = (saved !== undefined && saved !== "") ? saved : (c ? (c.note||"") : "");
+      const ownerName = c ? escapeHtml((state.members[c.owner]||{}).name||"") : "";
+      parts.push(`<div class="item">
+        <div class="iname">${escapeHtml(nameList[i])}${ownerName?`（${ownerName}）`:""}</div>
+        <div class="inote">${escapeHtml(note||"（無筆記）")}</div>
       </div>`);
     }
-    return parts.length ? parts.join("") : `<div class="item"><div class="inote">（無）</div></div>`;
+    return parts.join("");
   }
-  const locRows = await claimRows(game?game.locationClaims:{}, LOCATION_CARDS);
-  const susRows = await claimRows(game?game.suspectClaims:{}, SUSPECT_CARDS);
-
-  const fixedLocRows = LOCATION_LIST.map((loc,i)=>`
-    <div class="item"><div class="iname">${escapeHtml(loc)}</div><div class="inote">${escapeHtml((data.locNotes||{})[i]||"（無筆記）")}</div></div>`).join("");
-  const fixedPplRows = PEOPLE_LIST.map((p,i)=>`
-    <div class="item"><div class="iname">${escapeHtml(p)}</div><div class="inote">${escapeHtml((data.peopleNotes||{})[i]||"（無筆記）")}</div></div>`).join("");
+  const fixedLocRows = mergedRows(LOCATION_LIST, LOCATION_CARDS, game?game.locationClaims:{}, data.locNotes);
+  const fixedPplRows = mergedRows(PEOPLE_LIST, SUSPECT_CARDS, game?game.suspectClaims:{}, data.peopleNotes);
 
   const posterSection = (posterPhotoB64 && posterStats) ? `
   <section>
@@ -1219,20 +1214,12 @@ async function exportCharLogHtml(roleCode){
     ${relRows}
   </section>
   <section>
-    <h2>地點筆記</h2>
+    <h2>地點</h2>
     ${fixedLocRows}
   </section>
   <section>
-    <h2>人物筆記</h2>
+    <h2>嫌犯</h2>
     ${fixedPplRows}
-  </section>
-  <section>
-    <h2>已認領的地點卡（自動產生）</h2>
-    ${locRows}
-  </section>
-  <section>
-    <h2>已認領的嫌犯卡（自動產生）</h2>
-    ${susRows}
   </section>
   <footer>由密談室聊天網站匯出（此紀錄僅存在你自己的裝置上）</footer>
 </div>
@@ -1344,44 +1331,34 @@ function mountCharLog(mount, roleCode){
     incoming.forEach(t=> html += `<div class="charlog-item"><div class="inote">${escapeHtml(t)}</div></div>`);
   }
 
-  // 5 格人物、5 格地點：保留舊版可自由編輯的格式，玩家寫的內容永遠不會被覆蓋
-  html += `<div class="charlog-sub">地點（視需要填寫細節，可自行編輯）</div>`;
+  // 地點：欄位預填認領者寫的細節，玩家仍可自行編輯（編輯後以自己的版本為準）
+  const locClaims = game.locationClaims || {};
+  html += `<div class="charlog-sub">地點（可自行編輯）</div>`;
   LOCATION_LIST.forEach((loc,i)=>{
-    html += `<div class="charlog-item"><div class="iname">${loc}</div>
-      <textarea data-clloc="${i}" placeholder="細節…">${escapeHtml((data.locNotes||{})[i]||"")}</textarea></div>`;
-  });
-  html += `<div class="charlog-sub">人物（視需要填寫細節，可自行編輯）</div>`;
-  PEOPLE_LIST.forEach((p,i)=>{
-    html += `<div class="charlog-item"><div class="iname">${p}</div>
-      <textarea data-clppl="${i}" placeholder="細節…">${escapeHtml((data.peopleNotes||{})[i]||"")}</textarea></div>`;
+    const code = LOCATION_CARDS[i];
+    const claim = code ? locClaims[code] : null;
+    // 自己編輯過就用自己的，沒編輯過就帶入該卡認領者寫的細節
+    const saved = (data.locNotes||{})[i];
+    const value = (saved !== undefined && saved !== "") ? saved : (claim ? (claim.note||"") : "");
+    const ownerTag = claim ? `（${escapeHtml((state.members[claim.owner]||{}).name||"")}）` : "";
+    html += `<div class="charlog-item">
+      <div class="iname">${loc}${ownerTag}</div>
+      <textarea data-clloc="${i}" placeholder="細節…">${escapeHtml(value)}</textarea></div>`;
   });
 
-  // 所有地點卡（全員都看得到，不只認領者自己）
-  const locClaims = game.locationClaims || {};
-  if(Object.keys(locClaims).length){
-    html += `<div class="charlog-sub">已認領的地點卡（自動產生，僅供參考）</div>`;
-    LOCATION_CARDS.forEach((code,idx)=>{
-      const c = locClaims[code];
-      if(!c) return;
-      html += `<div class="charlog-item">
-        <div class="iname">地點 ${idx+1}（${escapeHtml((state.members[c.owner]||{}).name||"")}）</div>
-        <div class="slot-row"><div class="card-slot large"><img src="${cardImg(code,'face')}"></div></div>
-        <div class="inote">${escapeHtml(c.note||"")}</div></div>`;
-    });
-  }
-  // 所有嫌犯卡
+  // 嫌犯：同樣預填認領者寫的細節，可自行編輯
   const susClaims = game.suspectClaims || {};
-  if(Object.keys(susClaims).length){
-    html += `<div class="charlog-sub">已認領的嫌犯卡（自動產生，僅供參考）</div>`;
-    SUSPECT_CARDS.forEach((code,idx)=>{
-      const c = susClaims[code];
-      if(!c) return;
-      html += `<div class="charlog-item">
-        <div class="iname">嫌犯 ${idx+1}（${escapeHtml((state.members[c.owner]||{}).name||"")}）</div>
-        <div class="slot-row"><div class="card-slot large"><img src="${cardImg(code,'face')}"></div></div>
-        <div class="inote">${escapeHtml(c.note||"")}</div></div>`;
-    });
-  }
+  html += `<div class="charlog-sub">嫌犯（可自行編輯）</div>`;
+  PEOPLE_LIST.forEach((p,i)=>{
+    const code = SUSPECT_CARDS[i];
+    const claim = code ? susClaims[code] : null;
+    const saved = (data.peopleNotes||{})[i];
+    const value = (saved !== undefined && saved !== "") ? saved : (claim ? (claim.note||"") : "");
+    const ownerTag = claim ? `（${escapeHtml((state.members[claim.owner]||{}).name||"")}）` : "";
+    html += `<div class="charlog-item">
+      <div class="iname">${p}${ownerTag}</div>
+      <textarea data-clppl="${i}" placeholder="細節…">${escapeHtml(value)}</textarea></div>`;
+  });
 
   html += `</div>`;
   mount.innerHTML = html;

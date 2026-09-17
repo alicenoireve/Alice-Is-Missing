@@ -257,10 +257,10 @@ summary{font-size:13px; color:var(--accent-dark); cursor:pointer; padding:4px 0;
 
 /* ===== Card slot component ===== */
 .card-slot{
-  position:relative; width:100%; max-width:420px;
+  position:relative; width:100%; max-width:300px;
 }
 /* 大卡：一行一張，寬度吃滿可用空間，上限為原圖寬度420px避免糊掉 */
-.card-slot.large{ width:100%; max-width:420px; }
+.card-slot.large{ width:100%; max-width:300px; }
 .card-slot img{
   width:100%; aspect-ratio:3/4.08; object-fit:cover; border-radius:8px;
   border:1px solid var(--line); box-shadow:0 1px 3px rgba(0,0,0,.12); display:block;
@@ -273,7 +273,8 @@ summary{font-size:13px; color:var(--accent-dark); cursor:pointer; padding:4px 0;
 }
 
 /* 卡片列：改為直向排列，一行一張，卡面才夠大看得清楚 */
-.slot-row{ display:flex; flex-direction:column; align-items:center; gap:14px; padding:4px 2px 8px; }
+.slot-row{ display:flex; flex-direction:column; align-items:center; gap:14px; padding:4px 2px 8px; width:100%; }
+.slot-row > .card-slot{ width:100%; max-width:300px; }
 .slot-row::-webkit-scrollbar{display:none;}
 
 /* 放大版：角色 / 動機 專用，卡面才看得清楚 */
@@ -381,8 +382,9 @@ summary{font-size:13px; color:var(--accent-dark); cursor:pointer; padding:4px 0;
 .draw-row-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
 .draw-label{ font-weight:800; font-size:14px; color:var(--accent-dark); }
 .draw-owner{ font-size:12px; color:var(--ink-soft); }
-.draw-result{ display:flex; flex-direction:column; align-items:center; gap:8px; }
-.draw-result img{ width:100%; max-width:420px; aspect-ratio:3/4.08; object-fit:cover; border-radius:8px; border:1px solid var(--line); }
+.draw-result{ display:flex; flex-direction:column; align-items:center; gap:8px; width:100%; }
+.draw-result .card-slot{ width:100%; max-width:300px; }
+.draw-result img{ width:100%; max-width:300px; aspect-ratio:3/4.08; object-fit:cover; border-radius:8px; border:1px solid var(--line); }
 .choice-row{ display:flex; gap:8px; }
 .choice-card{ flex:1; border:1.5px solid var(--line); background:#fff; border-radius:8px; padding:6px; cursor:pointer; text-align:center; }
 .choice-card img{ width:100%; aspect-ratio:3/4.08; object-fit:cover; border-radius:6px; }
@@ -406,7 +408,7 @@ summary{font-size:13px; color:var(--accent-dark); cursor:pointer; padding:4px 0;
 
 .revealed-row{ display:flex; flex-direction:column; align-items:center; gap:14px; padding:2px 2px 6px; flex:1; }
 .revealed-row::-webkit-scrollbar{display:none;}
-.revealed-card{ width:100%; max-width:420px; text-align:center; }
+.revealed-card{ width:100%; max-width:300px; text-align:center; }
 .revealed-card img{ width:100%; aspect-ratio:3/4.08; object-fit:cover; border-radius:7px; border:1px solid var(--line); }
 .revealed-card .set-final-btn{
   margin-top:3px; font-size:9.5px; padding:3px 5px; border-radius:6px; border:1px solid var(--accent);
@@ -423,13 +425,13 @@ summary{font-size:13px; color:var(--accent-dark); cursor:pointer; padding:4px 0;
 .conclusion-row{ display:flex; flex-direction:column; gap:14px; align-items:center; }
 .conclusion-item{ width:100%; text-align:center; }
 .conclusion-item .clabel{ font-size:11px; color:var(--ink-soft); margin-bottom:4px; font-weight:700; }
-.conclusion-item img{ width:100%; max-width:420px; aspect-ratio:3/4.08; object-fit:cover; border-radius:8px; border:2px solid var(--accent); box-shadow:0 2px 8px rgba(0,0,0,.15); }
+.conclusion-item img{ width:100%; max-width:300px; aspect-ratio:3/4.08; object-fit:cover; border-radius:8px; border:2px solid var(--accent); box-shadow:0 2px 8px rgba(0,0,0,.15); }
 .conclusion-item .empty-mark{
-  width:100%; max-width:420px; aspect-ratio:3/4.08; margin:0 auto; border-radius:8px; border:2px dashed #d9c6bd;
+  width:100%; max-width:300px; aspect-ratio:3/4.08; margin:0 auto; border-radius:8px; border:2px dashed #d9c6bd;
   display:flex; align-items:center; justify-content:center; color:#c9bab2; font-size:13px;
 }
 .conclusion-item .locked-mark{
-  width:100%; max-width:420px; aspect-ratio:3/4.08; margin:0 auto; border-radius:8px; border:2px solid var(--line);
+  width:100%; max-width:300px; aspect-ratio:3/4.08; margin:0 auto; border-radius:8px; border:2px solid var(--line);
   display:flex; align-items:center; justify-content:center; color:var(--ink-soft); font-size:24px; background:#f4f6f5; cursor:pointer;
 }
 
