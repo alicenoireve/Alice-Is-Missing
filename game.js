@@ -345,6 +345,7 @@ function renderPhaseAction(){
     const roleCount = Object.keys(game.roleAssign||{}).length;
     const allRolesAssigned = roleCount === memberIds.length;
     const myMotive = (game.motiveAssign||{})[state.memberId];
+    const hasCharlieInRoles = !!(game.roleAssign||{})["S07-1"];
 
     let html = "";
 
@@ -354,7 +355,11 @@ function renderPhaseAction(){
         <div class="slot-row">
           <div class="card-slot large"><img src="${cardImg(myRole,'face')}"><div class="cap ${ROLE_CSS_CLASS[myRole]}" style="font-weight:700;">${ROLE_NAMES[myRole]}</div></div>
           <div class="card-slot large"><img src="${cardImg(myMotive,'face')}"></div>
-        </div>`;
+        </div>
+        <div class="pick-row"><button class="small-btn ghost" data-action="change-role">🔄 更換角色（動機不變）</button></div>`;
+      if(!hasCharlieInRoles){
+        html += `<p class="help-text" style="color:var(--danger);">⚠️ 目前還沒有人選擇查理，需要有人改選查理才能繼續。</p>`;
+      }
     } else {
       // ① 角色
       html += `<div class="block-section-label" style="margin-top:12px;">① 選擇角色</div>`;
@@ -590,6 +595,7 @@ function render(){
 
   let gateOk = true, gateMsg = "";
   if(game.phase === "intro" && memberIds.length < 2){ gateOk=false; gateMsg="至少需要 2 位玩家才能開始"; }
+  else if(game.phase === "roles" && !hasCharlie){ gateOk=false; gateMsg="需要有玩家選擇查理，才能繼續下一步"; }
   else if(game.phase === "record" && !allRecorded){ gateOk=false; gateMsg="要等所有人都錄好音"; }
   else if(game.phase === "ready" && !hasCharlie){ gateOk=false; gateMsg="需要有玩家選擇查理"; }
   else if(game.phase === "playback" && !allPlayed){ gateOk=false; gateMsg="要等所有人都播放完錄音"; }
@@ -767,6 +773,16 @@ document.addEventListener("click", e=>{
     toast(`已選擇角色：${ROLE_NAMES[code]}，記得把暱稱改成「${ROLE_NAMES[code]}」`);
   }
 
+  if(action === "change-role"){
+    const myRole = Object.keys(game.roleAssign||{}).find(c=>game.roleAssign[c]===state.memberId);
+    if(!myRole) return;
+    const patch = {};
+    patch[`roleAssign/${myRole}`] = null; // 釋放原本的角色
+    patch[`phaseConfirm/${state.memberId}`] = null; // 同時取消自己的確認狀態，重新選完再按下一步
+    update(patch);
+    toast("已取消角色，請重新選擇");
+  }
+
   if(action === "draw-motive"){
     const totalMembers = Object.keys(state.members||{}).length;
     const rolesAssignedCount = Object.keys(game.roleAssign||{}).length;
@@ -911,6 +927,7 @@ function tryAdvancePhase(){
   const allPlayed = (game.playbackIndex||0) >= playbackOrder.length;
 
   if(game.phase==="intro" && memberIds.length<2) return;
+  if(game.phase==="roles" && !hasCharlie) return;
   if(game.phase==="record" && !allRecorded) return;
   if(game.phase==="ready" && !hasCharlie) return;
   if(game.phase==="playback" && !allPlayed) return;
@@ -941,6 +958,9 @@ $("btnPhaseNext").addEventListener("click", ()=>{
 
   if(game.phase === "intro" && memberIds.length < 2){
     toast("⚠️ 至少需要 2 位玩家才能開始遊戲"); return;
+  }
+  if(game.phase === "roles" && !hasCharlie){
+    toast("⚠️ 需要有玩家選擇查理，才能繼續下一步"); return;
   }
   if(game.phase === "record" && !allRecorded){
     toast("⚠️ 要等所有人都錄好音才能繼續"); return;
