@@ -194,6 +194,9 @@ $("btnLeaveRoom").addEventListener("click", async ()=>{
   $("gamePanel").style.display = "none";
   $("musicCard").style.display = "none";
   $("musicDock").style.display = "none";
+  if(window.spotifyController){
+    try{ window.spotifyController.pause(); }catch(e){}
+  }
   $("roomPill").textContent = "尚未加入房間";
   $("msgGate").style.display = "flex";
   $("msgContent").style.display = "none";
@@ -527,6 +530,7 @@ function sendMessage(){
 /* ---------- Timer ---------- */
 let lastTimerRunningForMusic = null;
 function attachTimer(){
+  if(timerRef) timerRef.off(); // 防呆：避免重複綁定造成監聽器疊加、音樂控制被重複觸發
   timerRef = db.ref(`rooms/${state.roomId}/timer`);
   timerRef.on("value", snap=>{
     const v = snap.val();
