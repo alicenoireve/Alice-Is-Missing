@@ -192,11 +192,6 @@ $("btnLeaveRoom").addEventListener("click", async ()=>{
   $("roomJoinedBlock").style.display = "none";
   $("roomJoinBlock").style.display = "block";
   $("gamePanel").style.display = "none";
-  $("musicCard").style.display = "none";
-  $("musicDock").style.display = "none";
-  if(window.spotifyController){
-    try{ window.spotifyController.pause(); }catch(e){}
-  }
   $("roomPill").textContent = "尚未加入房間";
   $("msgGate").style.display = "flex";
   $("msgContent").style.display = "none";
@@ -237,8 +232,6 @@ function enterRoom(roomId, memberId, name){
   $("roomCodeDisplay").textContent = roomId;
   $("roomPill").textContent = roomId;
   $("gamePanel").style.display = "flex";
-  $("musicCard").style.display = "block";
-  $("musicDock").style.display = "block";
   $("msgGate").style.display = "none";
   $("msgContent").style.display = "flex";
 
@@ -528,7 +521,6 @@ function sendMessage(){
 }
 
 /* ---------- Timer ---------- */
-let lastTimerRunningForMusic = null;
 function attachTimer(){
   if(timerRef) timerRef.off(); // 防呆：避免重複綁定造成監聽器疊加、音樂控制被重複觸發
   timerRef = db.ref(`rooms/${state.roomId}/timer`);
@@ -537,17 +529,6 @@ function attachTimer(){
     if(v) state.timer = v;
     updateTimerUI();
 
-    // 音樂跟著計時狀態走：所有裝置各自的播放器都在計時開始時播放、計時重置/未開始時暫停
-    const running = !!(state.timer && state.timer.running);
-    if(running !== lastTimerRunningForMusic){
-      lastTimerRunningForMusic = running;
-      if(running){
-        if(window.spotifyController){ try{ window.spotifyController.play(); }catch(e){} }
-        else if(window.createSpotifyPlayerIfNeeded){ window.createSpotifyPlayerIfNeeded(); }
-      } else if(window.spotifyController){
-        try{ window.spotifyController.pause(); }catch(e){}
-      }
-    }
   });
 }
 function startGameTimer(){

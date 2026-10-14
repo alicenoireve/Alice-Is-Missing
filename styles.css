@@ -67,14 +67,6 @@ body{
 }
 
 /* ===== Tab bar (bottom) ===== */
-/* ===== 跨分頁常駐音樂列（刻意放在 .view 系統外，切分頁不會被 display:none 影響） ===== */
-#musicDock{
-  flex-shrink:0; border-top:1px solid var(--line); background:#fff; overflow:hidden;
-}
-.music-dock-placeholder{
-  padding:10px 16px; font-size:12px; color:var(--ink-soft); text-align:center;
-}
-
 .tabbar{
   display:none;
   border-top:1px solid var(--line);
