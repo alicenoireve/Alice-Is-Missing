@@ -301,9 +301,9 @@ summary{font-size:13px; color:var(--accent-dark); cursor:pointer; padding:4px 0;
 .player-block-head .pname{ font-weight:800; font-size:14px; }
 .player-block-head .you-tag{ font-size:10px; color:var(--accent-dark); font-weight:700; margin-left:auto;}
 
-.block-section-label{ font-size:11px; color:var(--ink-soft); margin:8px 2px 2px; font-weight:700; }
+.block-section-label{ font-size:14px; color:var(--ink); margin:22px 2px 10px; font-weight:800; }
 
-.pick-row{ display:flex; flex-wrap:wrap; gap:6px; margin:4px 2px; }
+.pick-row{ display:flex; flex-wrap:wrap; gap:10px; margin:8px 2px 12px; }
 .pick-btn{
   padding:6px 12px; border-radius:999px; border:1.5px solid var(--accent);
   background:#fff; color:var(--accent-dark); font-size:12px; font-weight:700; cursor:pointer;
@@ -317,7 +317,7 @@ summary{font-size:13px; color:var(--accent-dark); cursor:pointer; padding:4px 0;
 .small-btn.ghost{ background:#f0e6df; color:var(--ink-soft); }
 
 .charlog-lock{ font-size:12px; color:#b4bab6; text-align:center; padding:10px; }
-.charlog-box textarea{ min-height:52px; font-family:inherit; font-size:13px; }
+.charlog-box textarea{ min-height:84px; font-family:inherit; font-size:14px; line-height:1.6; }
 .charlog-role-row{ display:flex; flex-wrap:wrap; gap:6px; margin:6px 2px; }
 .charlog-role-opt{
   padding:6px 10px; border-radius:999px; border:1.5px solid var(--line); font-size:12px; cursor:pointer; background:#fff;
@@ -366,7 +366,7 @@ summary{font-size:13px; color:var(--accent-dark); cursor:pointer; padding:4px 0;
 }
 
 /* ===== 抽卡佇列（live 階段） ===== */
-.draw-queue{ display:flex; flex-direction:column; gap:8px; margin-top:12px; }
+.draw-queue{ display:flex; flex-direction:column; gap:12px; margin-top:12px; }
 .draw-row{ padding:10px; border-radius:var(--radius-md); border:1.5px solid var(--line); background:#f8f9f8; }
 .draw-row.active{ border-color:var(--accent); background:var(--accent-soft); }
 .draw-row.done{ opacity:.75; }
@@ -382,10 +382,10 @@ summary{font-size:13px; color:var(--accent-dark); cursor:pointer; padding:4px 0;
 .choice-card img{ width:100%; aspect-ratio:3/4.08; object-fit:cover; border-radius:6px; }
 .choice-card .cap{ font-size:11px; color:var(--ink-soft); margin-top:3px; display:block; }
 .choice-card:active{ border-color:var(--accent); }
-.charlog-sub{ font-size:11px; color:var(--ink-soft); margin:8px 2px 2px; }
-.charlog-item{ margin:4px 2px; }
-.charlog-item .iname{ font-size:12.5px; font-weight:600; }
-.charlog-item textarea{ width:100%; margin-top:3px; padding:7px 9px; border-radius:8px; border:1px solid var(--line); font-size:12.5px; background:#fbfbfa;}
+.charlog-sub{ font-size:15px; font-weight:800; color:var(--ink); margin:28px 2px 10px; padding-bottom:6px; border-bottom:1px solid var(--line); }
+.charlog-item{ margin:16px 2px; }
+.charlog-item .iname{ font-size:13px; font-weight:700; color:var(--ink-soft); margin-bottom:6px; }
+.charlog-item textarea{ width:100%; margin-top:4px; padding:10px 12px; border-radius:10px; border:1px solid var(--line); font-size:14px; background:#fbfbfa;}
 
 /* ===== Shared area ===== */
 .shared-area{ background:var(--card); border-radius:var(--radius-lg); padding:14px; border:1px solid var(--line); }
@@ -595,3 +595,25 @@ body.theme-dark .role-c5{ color:#e0c060; }
   body{background:#dfe4e1;}
   #app{margin:16px auto; height:calc(100dvh - 32px); border-radius:20px; overflow:hidden;}
 }
+
+
+/* ===== 可收合區塊（地點／嫌犯／劇情卡各時間共用） ===== */
+.collapse-block{
+  border:1px solid var(--line); border-radius:var(--radius-md); background:#fff;
+  margin:12px 0; overflow:hidden;
+}
+.collapse-block > summary{
+  list-style:none; display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:14px 16px; cursor:pointer; font-size:15px; font-weight:800; color:var(--ink);
+}
+.collapse-block > summary::-webkit-details-marker{ display:none; }
+.collapse-block > summary::after{ content:"▾"; color:var(--ink-soft); font-size:12px; margin-left:4px; transition:transform .15s; }
+.collapse-block[open] > summary::after{ transform:rotate(180deg); }
+.collapse-title{ flex:1; }
+.collapse-status{ font-size:12px; font-weight:600; color:var(--ink-soft); }
+.collapse-status.done{ color:var(--accent-dark); }
+.collapse-body{ padding:4px 16px 18px; border-top:1px solid var(--line); }
+.collapse-body textarea{ width:100%; min-height:96px; font-family:inherit; font-size:14px; line-height:1.6; }
+.claim-note{ font-size:14px; line-height:1.7; color:var(--ink); white-space:pre-wrap; background:var(--accent-soft); border-radius:10px; padding:12px 14px; }
+.note-add-row{ display:flex; gap:10px; margin-top:12px; }
+.note-del{ float:right; background:none; border:none; color:var(--ink-soft); font-size:12px; cursor:pointer; padding:0; }

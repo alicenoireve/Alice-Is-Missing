@@ -157,11 +157,8 @@ const CHAR_LIST = [
   {name:"朱莉亞·諾斯", tag:"秘密女友"},
   {name:"埃文·霍威爾", tag:"暗戀她的人"},
 ];
-const LOCATION_LIST = ["靜瀑鎮火車站","嘯海崖上的燈塔","卡利斯托河州立公園","血刃俱樂部","劍橋街上的舊穀倉"];
-const PEOPLE_LIST = [
-  "萊恩·格羅金斯 – 前男友","哈維特先生 – 歷史老師","大衛·尼爾森 – 風雲人物",
-  "布莉亞·布朗 – 霸凌者","CJ·華萊士 – 怪胎"
-];
+const LOCATION_LIST = ["靜瀑鎮火車站","卡利斯托河州立公園","劍橋街上的舊穀倉","血刃俱樂部","嘯海崖上的燈塔"];
+const PEOPLE_LIST = ["布莉亞．布朗","C. J. 華萊士","大衛．尼爾森","哈維特先生","萊恩．格羅金斯"];
 
 /* ---------- 狀態 ---------- */
 let gameRef = null;
@@ -185,7 +182,7 @@ function onRoomEnter(){
         roleAssign:{}, motiveAssign:{}, timerSlotAssign:{}, timerSlotDraw:{},
         sharedPools:{ location:{revealed:{}, finalCode:null, finalSetBy:null}, suspect:{revealed:{}, finalCode:null, finalSetBy:null}, clue:{revealed:{}} },
         finalDraw:{ code:null, coin:null, text:null },
-        recordingConfirmed:{}, recordings:{}, playbackIndex:0, playbackTrigger:null, phaseConfirm:{}, posterPickerId:null, posterIndex:0, posterSelected:null, relationshipAssign:{}, locationClaims:{}, suspectClaims:{},
+        recordingConfirmed:{}, recordings:{}, playbackIndex:0, playbackTrigger:null, phaseConfirm:{}, posterPickerId:null, posterIndex:0, posterSelected:null, assignPickerId:null, assignDone:false, relationshipAssign:{}, locationClaims:{}, suspectClaims:{},
         usedCards:{}, finaleRevealed:false
       });
     }
@@ -210,7 +207,7 @@ function emptyGame(){
     phase:"intro", roleAssign:{}, motiveAssign:{}, timerSlotAssign:{}, timerSlotDraw:{},
     sharedPools:{ location:{revealed:{},finalCode:null,finalSetBy:null}, suspect:{revealed:{},finalCode:null,finalSetBy:null}, clue:{revealed:{}} },
     finalDraw:{ code:null, coin:null, text:null },
-    recordingConfirmed:{}, recordings:{}, playbackIndex:0, playbackTrigger:null, phaseConfirm:{}, posterPickerId:null, posterIndex:0, posterSelected:null, relationshipAssign:{}, locationClaims:{}, suspectClaims:{},
+    recordingConfirmed:{}, recordings:{}, playbackIndex:0, playbackTrigger:null, phaseConfirm:{}, posterPickerId:null, posterIndex:0, posterSelected:null, assignPickerId:null, assignDone:false, relationshipAssign:{}, locationClaims:{}, suspectClaims:{},
     usedCards:{}, finaleRevealed:false
   };
 }
@@ -306,7 +303,43 @@ function drawRandom(pool){
 /* ============================================================
    渲染
    ============================================================ */
+function capturePhaseFormState(area){
+  const st = { open:{}, values:{}, focus:null };
+  if(!area) return st;
+  area.querySelectorAll("details[data-keep]").forEach(d=>{ st.open[d.dataset.keep] = d.open; });
+  area.querySelectorAll("textarea[id], select[id], input[id]").forEach(el=>{ st.values[el.id] = el.value; });
+  const ae = document.activeElement;
+  if(ae && ae.id && area.contains(ae)){
+    st.focus = { id: ae.id, start: ae.selectionStart, end: ae.selectionEnd };
+  }
+  return st;
+}
+function restorePhaseFormState(area, st){
+  if(!area || !st) return;
+  area.querySelectorAll("details[data-keep]").forEach(d=>{
+    if(Object.prototype.hasOwnProperty.call(st.open, d.dataset.keep)) d.open = st.open[d.dataset.keep];
+  });
+  Object.keys(st.values).forEach(id=>{
+    const el = document.getElementById(id);
+    if(el && area.contains(el) && el.value !== st.values[id]) el.value = st.values[id];
+  });
+  if(st.focus){
+    const el = document.getElementById(st.focus.id);
+    if(el){
+      el.focus();
+      try{ el.setSelectionRange(st.focus.start, st.focus.end); }catch(e){}
+    }
+  }
+}
+// 包一層：每次重畫前先記下玩家正在輸入的字與展開狀態，畫完再還原
 function renderPhaseAction(){
+  const area = $("phaseActionArea");
+  const st = capturePhaseFormState(area);
+  renderPhaseActionInner();
+  restorePhaseFormState(area, st);
+}
+
+function renderPhaseActionInner(){
   const area = $("phaseActionArea");
   if(!area) return;
   const memberIds = Object.keys(state.members||{});
@@ -417,45 +450,53 @@ function renderPhaseAction(){
   if(game.phase === "locations" || game.phase === "suspects"){
     const isLoc = game.phase === "locations";
     const pool = isLoc ? LOCATION_CARDS : SUSPECT_CARDS;
+    const names = isLoc ? LOCATION_LIST : PEOPLE_LIST;
     const claims = (isLoc ? game.locationClaims : game.suspectClaims) || {};
     const label = isLoc ? "地點" : "嫌犯";
     const claimedCount = Object.keys(claims).length;
 
-    let html = `<p class="help-text" style="margin-top:10px;">每位玩家可以認領一個或多個${label}卡，並填寫細節，所有人都看得到。全部 ${pool.length} 張都要有人認領，且同一張不能被兩個人認領（已認領：${claimedCount}/${pool.length}）。</p>`;
-
-    html += `<div class="draw-queue">`;
+    let html = `<p class="help-text" style="margin-top:12px;">每位玩家可以認領一個或多個${label}，點開後寫下細節，所有人都看得到。全部 ${pool.length} 個都要有人認領，同一個不能被兩個人認領（已認領 ${claimedCount}/${pool.length}）。</p>`;
     pool.forEach((code,idx)=>{
       const claim = claims[code];
       const ownerId = claim ? claim.owner : null;
       const note = claim ? claim.note : "";
-      html += `<div class="draw-row ${ownerId?'done':'active'}">
-        <div class="draw-row-head">
-          <span class="draw-label">${label} ${idx+1}</span>
-          <span class="draw-owner">${ownerId ? ((state.members[ownerId]||{}).name||"") : "尚未認領"}</span>
+      const ownerName = ownerId ? ((state.members[ownerId]||{}).name||"") : "";
+      html += `<details class="collapse-block" data-keep="card_${code}">
+        <summary><span class="collapse-title">${escapeHtml(names[idx])}</span>
+          <span class="collapse-status ${ownerId?'done':''}">${ownerId ? "✅ "+escapeHtml(ownerName) : "尚未認領"}</span></summary>
+        <div class="collapse-body">
+          <div class="card-slot large" style="margin:4px auto 16px;"><img src="${cardImg(code,'face')}"></div>
+          ${ownerId
+            ? `<div class="claim-note">${escapeHtml(note)}</div>`
+            : `<textarea id="claimNote_${code}" placeholder="寫下這個${label}的細節…"></textarea>
+               <button class="small-btn" style="margin-top:12px;" data-action="claim-card" data-pool="${isLoc?'location':'suspect'}" data-code="${code}">認領並儲存</button>`}
         </div>
-        <div class="draw-result"><div class="card-slot large"><img src="${cardImg(code,'face')}"></div></div>`;
-      if(!ownerId){
-        html += `<textarea id="claimNote_${code}" placeholder="寫下這個${label}的細節…" style="margin-top:6px;"></textarea>
-          <button class="small-btn" style="margin-top:6px;" data-action="claim-card" data-pool="${isLoc?'location':'suspect'}" data-code="${code}">認領並儲存</button>`;
-      } else {
-        html += `<div class="help-text" style="margin-top:6px; color:var(--ink);">${escapeHtml(note)}</div>`;
-      }
-      html += `</div>`;
+      </details>`;
     });
-    html += `</div>`;
     area.innerHTML = html;
     return;
   }
 
   if(game.phase === "assign"){
-    const groupKeys = TIMER_GROUPS.filter(g=>g.key!=="S07-6").map(g=>g.key);
+    const pickerValid = game.assignPickerId && memberIds.includes(game.assignPickerId);
+    if(!pickerValid && memberIds.length>0){
+      const pick = memberIds[Math.floor(Math.random()*memberIds.length)];
+      update({ assignPickerId: pick });
+      return;
+    }
     const charlieId = (game.roleAssign||{})["S07-1"] || null;
-    let html = `
-      <button class="btn btn-outline" data-action="auto-assign" style="margin-top:10px;">🎲 自動平均分配劇情卡（80~20，共9張）</button>
-      <p class="help-text">
-        「90」（S07-6）固定屬於查理，「10」（最終抉擇）不計入。分配其餘 9 張時，系統會把查理已經固定拿到的那 1 張算進總數裡，盡量讓每個人最終拿到的「總張數」一樣多，並確保 45/40、40/35、35/30 這幾組不會落在同一人身上。按一次即可，若想重新洗牌可以再按一次。
-      </p>
-      <div class="assign-table">`;
+    const isPicker = game.assignPickerId === state.memberId;
+    const pickerName = escapeHtml((state.members[game.assignPickerId]||{}).name || "");
+    let html = "";
+    if(game.assignDone){
+      html += `<p class="help-text" style="margin-top:12px;">✅ 劇情卡已分配完成，請按「下一步」。</p>`;
+    } else if(isPicker){
+      html += `<button class="btn btn-outline" data-action="auto-assign" style="margin-top:12px;">🎲 自動分配劇情卡</button>
+        <p class="help-text">只有你能按，而且只能按一次。</p>`;
+    } else {
+      html += `<p class="help-text" style="margin-top:12px;">由 <b>${pickerName}</b> 負責自動分配劇情卡，請稍候。</p>`;
+    }
+    html += `<div class="assign-table">`;
     TIMER_GROUPS.forEach(g=>{
       const isCharlieSlot = g.key === "S07-6";
       const assignedTo = isCharlieSlot ? charlieId : (game.timerSlotAssign||{})[g.key];
@@ -485,20 +526,25 @@ function renderPhaseAction(){
       if(!due && !drawn) return; // 還沒到時間的不預留位置，直接不顯示
       anyShown = true;
 
-      html += `<div class="draw-row ${drawn?'done':'active'}">
-        <div class="draw-row-head"><span class="draw-label">${g.label}</span><span class="draw-owner">${escapeHtml(ownerName)}</span></div>`;
+      const mine = ownerId === state.memberId;
+      const statusText = drawn ? "已抽取" : (mine ? "輪到你抽取" : "等待 " + escapeHtml(ownerName));
+      const defaultOpen = (!drawn && mine) ? " open" : "";
+      html += `<details class="collapse-block" data-keep="slot_${g.key}"${defaultOpen}>
+        <summary><span class="collapse-title">${g.label}</span>
+          <span class="collapse-status ${drawn?'done':''}">${escapeHtml(ownerName)}・${statusText}</span></summary>
+        <div class="collapse-body">`;
 
       if(drawn){
         const canSee = ownerId === state.memberId;
         html += canSee
           ? `<div class="draw-result"><div class="card-slot large"><img src="${cardImg(drawState.code,'face')}"></div></div>`
           : `<div class="draw-result"><div class="card-slot large placeholder">🔒</div><span class="cap">已抽取（僅 ${escapeHtml(ownerName)} 本人看得到）</span></div>`;
-      } else if(ownerId === state.memberId){
+      } else if(mine){
         html += `<button class="small-btn" data-action="draw-timer" data-group="${g.key}">抽取</button>`;
       } else {
         html += `<div class="charlog-lock">🔒 等待 ${escapeHtml(ownerName)} 抽取</div>`;
       }
-      html += `</div>`;
+      html += `</div></details>`;
     });
     html += `</div>`;
     if(!anyShown) html = `<p class="help-text" style="margin-top:10px;">⏳ 還沒有劇情卡到抽取時間</p>`;
@@ -596,6 +642,7 @@ function render(){
   let gateOk = true, gateMsg = "";
   if(game.phase === "intro" && memberIds.length < 2){ gateOk=false; gateMsg="至少需要 2 位玩家才能開始"; }
   else if(game.phase === "roles" && !hasCharlie){ gateOk=false; gateMsg="需要有玩家選擇查理，才能繼續下一步"; }
+  else if(game.phase === "assign" && !game.assignDone){ gateOk=false; gateMsg="需要先完成劇情卡自動分配"; }
   else if(game.phase === "record" && !allRecorded){ gateOk=false; gateMsg="要等所有人都錄好音"; }
   else if(game.phase === "ready" && !hasCharlie){ gateOk=false; gateMsg="需要有玩家選擇查理"; }
   else if(game.phase === "playback" && !allPlayed){ gateOk=false; gateMsg="要等所有人都播放完錄音"; }
@@ -894,6 +941,8 @@ document.addEventListener("click", e=>{
   }
 
   if(action === "auto-assign"){
+    if(game.assignPickerId !== state.memberId){ toast("這個步驟由其他玩家負責"); return; }
+    if(game.assignDone){ toast("已經分配過了"); return; }
     autoDistributeTimerSlots();
   }
 
@@ -928,6 +977,7 @@ function tryAdvancePhase(){
 
   if(game.phase==="intro" && memberIds.length<2) return;
   if(game.phase==="roles" && !hasCharlie) return;
+  if(game.phase==="assign" && !game.assignDone) return;
   if(game.phase==="record" && !allRecorded) return;
   if(game.phase==="ready" && !hasCharlie) return;
   if(game.phase==="playback" && !allPlayed) return;
@@ -961,6 +1011,9 @@ $("btnPhaseNext").addEventListener("click", ()=>{
   }
   if(game.phase === "roles" && !hasCharlie){
     toast("⚠️ 需要有玩家選擇查理，才能繼續下一步"); return;
+  }
+  if(game.phase === "assign" && !game.assignDone){
+    toast("⚠️ 需要先完成劇情卡自動分配"); return;
   }
   if(game.phase === "record" && !allRecorded){
     toast("⚠️ 要等所有人都錄好音才能繼續"); return;
@@ -1053,6 +1106,7 @@ function autoDistributeTimerSlots(){
 
   const patch = {};
   groupKeys.forEach(key=>{ patch[`timerSlotAssign/${key}`] = assign[key]; });
+  patch.assignDone = true;
   update(patch);
 
   // 顯示每人「總」張數（含查理固定的90），方便主持人確認平均
