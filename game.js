@@ -1164,37 +1164,14 @@ async function exportCharLogHtml(roleCode){
   const posterPhotoB64 = posterIdx ? await imgToBase64(`assets/posters/photo${posterIdx}.jpg`) : null;
   const posterStats = posterIdx ? POSTER_STATS[posterIdx] : null;
 
-  // 關係語句（跟紀錄頁同一套邏輯）
-  const relAssign = (game && game.relationshipAssign) || {};
-  const relLines = [];
-  if(motiveCode && relAssign[state.memberId]){
-    const tmpls = MOTIVE_RELATIONSHIP_TEMPLATES[motiveCode] || [];
-    const mine = relAssign[state.memberId];
-    [["f1",0],["f2",1]].forEach(([key,i])=>{
-      const targetId = mine[key];
-      if(targetId && tmpls[i]){
-        const targetRole = Object.keys(game.roleAssign||{}).find(c=>game.roleAssign[c]===targetId);
-        const targetName = targetRole ? ROLE_NAMES[targetRole] : ((state.members[targetId]||{}).name||"");
-        relLines.push(transformRelationshipText(tmpls[i], true, "", targetName));
-      }
-    });
-  }
-  if(game) memberIds.forEach(mid=>{
-    if(mid===state.memberId) return;
-    const theirMotive = (game.motiveAssign||{})[mid];
-    const theirAssign = relAssign[mid];
-    if(!theirMotive || !theirAssign) return;
-    const tmpls = MOTIVE_RELATIONSHIP_TEMPLATES[theirMotive] || [];
-    const speakerRole = Object.keys(game.roleAssign||{}).find(c=>game.roleAssign[c]===mid);
-    const speakerName = speakerRole ? ROLE_NAMES[speakerRole] : ((state.members[mid]||{}).name||"");
-    [["f1",0],["f2",1]].forEach(([key,i])=>{
-      if(theirAssign[key]===state.memberId && tmpls[i]){
-        relLines.push(transformRelationshipText(tmpls[i], false, speakerName, ""));
-      }
-    });
-  });
-  const relRows = relLines.length
-    ? relLines.map(t=>`<div class="item"><div class="inote">${escapeHtml(t)}</div></div>`).join("")
+  // 關係：用跟紀錄頁同一套（玩家編輯過的優先）
+  const relItems = getRelationItems();
+  const relRows = relItems.length
+    ? relItems.map(it=>`<div class="item"><div class="iname">與 ${escapeHtml(it.other)}</div><div class="inote">${escapeHtml(pickNote((data.relNotes||{})[it.key], it.text))}</div></div>`).join("")
+    : `<div class="item"><div class="inote">（無）</div></div>`;
+  const noteList = (data.extraNotes && data.extraNotes.length) ? data.extraNotes : [];
+  const noteRows = noteList.filter(t=>t && t.trim()).length
+    ? noteList.map((t,i)=> (t && t.trim()) ? `<div class="item"><div class="iname">筆記 ${i+1}</div><div class="inote">${escapeHtml(t)}</div></div>` : "").join("")
     : `<div class="item"><div class="inote">（無）</div></div>`;
 
   // 地點/嫌犯：合併呈現，卡片圖＋細節（玩家自己編輯過的優先，否則用認領者寫的）
@@ -1204,7 +1181,7 @@ async function exportCharLogHtml(roleCode){
       const code = pool[i];
       const c = code ? (claimsObj||{})[code] : null;
       const saved = (savedNotes||{})[i];
-      const note = (saved !== undefined && saved !== "") ? saved : (c ? (c.note||"") : "");
+      const note = pickNote(saved, c ? (c.note||"") : "");
       const ownerName = c ? escapeHtml((state.members[c.owner]||{}).name||"") : "";
       parts.push(`<div class="item">
         <div class="iname">${escapeHtml(nameList[i])}${ownerName?`（${ownerName}）`:""}</div>
@@ -1264,7 +1241,7 @@ async function exportCharLogHtml(roleCode){
     <div class="secret">${escapeHtml(data.secret||"（尚未填寫）")}</div>
   </section>
   <section>
-    <h2>關係（自動產生）</h2>
+    <h2>關係</h2>
     ${relRows}
   </section>
   <section>
@@ -1274,6 +1251,10 @@ async function exportCharLogHtml(roleCode){
   <section>
     <h2>嫌犯</h2>
     ${fixedPplRows}
+  </section>
+  <section>
+    <h2>筆記</h2>
+    ${noteRows}
   </section>
   <footer>由密談室聊天網站匯出（此紀錄僅存在你自己的裝置上）</footer>
 </div>
@@ -1308,133 +1289,166 @@ $("btnExportCharlog").addEventListener("click", async ()=>{
   toast("已匯出角色紀錄");
 });
 
-function mountCharLog(mount, roleCode){
-  if(!mount) return;
-  const data = loadCharLogData();
-
-  const memberIds = Object.keys(state.members||{});
-  const motiveCode = game ? (game.motiveAssign||{})[state.memberId] : null;
-  const posterIdx = game ? game.posterSelected : null;
-  // 「按下一步的同時，角色紀錄中才會顯示」：還在 roles 階段、且自己還沒按確認時，先不顯示角色/動機/秘密/關係
-  const rolesRevealed = !game || game.phase !== "roles" || !!(game.phaseConfirm||{})[state.memberId] || PHASES.indexOf(game.phase) > PHASES.indexOf("roles");
-
-  let html = `<div class="charlog-box">`;
-
-  if(posterIdx){
-    html += `<div class="charlog-sub" style="margin-top:0;">愛麗絲的失蹤海報</div>
-      <div style="padding:4px 0 10px;">${renderPosterCard(posterIdx)}</div>`;
-  }
-
-  if(!rolesRevealed){
-    html += `<div class="charlog-lock" style="padding:20px 10px;">🔒 請到「遊戲」頁籤完成角色、動機、秘密與關係分配，按下一步後這裡才會顯示。</div></div>`;
-    mount.innerHTML = html;
-    return;
-  }
-
-  html += `<div class="charlog-sub" style="margin-top:0;">你的角色與動機</div>
-    <div class="slot-row">`;
-  if(roleCode){
-    html += `<div class="card-slot large"><img src="${cardImg(roleCode,'face')}"><div class="cap ${ROLE_CSS_CLASS[roleCode]}" style="font-weight:700;">${ROLE_NAMES[roleCode]}</div></div>`;
-  } else {
-    html += `<div class="card-slot large placeholder">?</div>`;
-  }
-  if(motiveCode){
-    html += `<div class="card-slot large"><img src="${cardImg(motiveCode,'face')}"></div>`;
-  } else {
-    html += `<div class="card-slot large placeholder">?</div>`;
-  }
-  html += `</div>`;
-
-  html += `<div class="charlog-sub">我的秘密</div>
-    <textarea data-clfield="secret" placeholder="寫下你的秘密…">${escapeHtml(data.secret||"")}</textarea>`;
-
-  // 關係語句：我對別人說的 + 別人對我說的
-  const relAssign = (game && game.relationshipAssign) || {};
-  const outgoing = [];
-  const incoming = [];
+// 關係語句：自己說的 + 別人對自己說的。key 固定（依說話者與欄位），玩家編輯後的版本存在本機 relNotes
+function getRelationItems(){
+  const items = [];
+  if(!game) return items;
+  const relAssign = game.relationshipAssign || {};
+  const motiveCode = (game.motiveAssign||{})[state.memberId];
+  const roleNameOf = (mid)=>{
+    const rc = Object.keys(game.roleAssign||{}).find(c=>game.roleAssign[c]===mid);
+    return rc ? ROLE_NAMES[rc] : ((state.members[mid]||{}).name||"");
+  };
   if(motiveCode && relAssign[state.memberId]){
     const tmpls = MOTIVE_RELATIONSHIP_TEMPLATES[motiveCode] || [];
     const mine = relAssign[state.memberId];
     [["f1",0],["f2",1]].forEach(([key,i])=>{
-      const targetId = mine[key];
-      if(targetId && tmpls[i]){
-        const targetRole = Object.keys(game.roleAssign||{}).find(c=>game.roleAssign[c]===targetId);
-        const targetName = targetRole ? ROLE_NAMES[targetRole] : ((state.members[targetId]||{}).name||"");
-        outgoing.push(transformRelationshipText(tmpls[i], true, "", targetName));
+      const tid = mine[key];
+      if(tid && tmpls[i]){
+        items.push({ key:`out_${key}`, other:roleNameOf(tid),
+          text: transformRelationshipText(tmpls[i], true, "", roleNameOf(tid)) });
       }
     });
   }
-  memberIds.forEach(mid=>{
+  Object.keys(state.members||{}).forEach(mid=>{
     if(mid===state.memberId) return;
     const theirMotive = (game.motiveAssign||{})[mid];
     const theirAssign = relAssign[mid];
     if(!theirMotive || !theirAssign) return;
     const tmpls = MOTIVE_RELATIONSHIP_TEMPLATES[theirMotive] || [];
-    const speakerRole = Object.keys(game.roleAssign||{}).find(c=>game.roleAssign[c]===mid);
-    const speakerName = speakerRole ? ROLE_NAMES[speakerRole] : ((state.members[mid]||{}).name||"");
     [["f1",0],["f2",1]].forEach(([key,i])=>{
       if(theirAssign[key]===state.memberId && tmpls[i]){
-        incoming.push(transformRelationshipText(tmpls[i], false, speakerName, ""));
+        items.push({ key:`in_${mid}_${key}`, other:roleNameOf(mid),
+          text: transformRelationshipText(tmpls[i], false, roleNameOf(mid), "") });
       }
     });
   });
+  return items;
+}
 
-  if(outgoing.length || incoming.length){
-    html += `<div class="charlog-sub">關係（自動產生，僅供參考）</div>`;
-    outgoing.forEach(t=> html += `<div class="charlog-item"><div class="inote">${escapeHtml(t)}</div></div>`);
-    incoming.forEach(t=> html += `<div class="charlog-item"><div class="inote">${escapeHtml(t)}</div></div>`);
+// 玩家自己編輯過（含刻意清空）就用自己的，沒編輯過就帶入系統產生的內容
+function pickNote(saved, fallback){
+  return (saved !== undefined) ? saved : (fallback || "");
+}
+
+function mountCharLog(mount, roleCode, clearFocus){
+  if(!mount) return;
+  const st = capturePhaseFormState(mount);
+  st.values = {};                       // 欄位內容以本機儲存為準，不用畫面上的舊值蓋回去
+  if(clearFocus) st.focus = null;
+
+  const data = loadCharLogData();
+  const memberIds = Object.keys(state.members||{});
+  const motiveCode = game ? (game.motiveAssign||{})[state.memberId] : null;
+  const posterIdx = game ? game.posterSelected : null;
+  // 還在 roles 階段、且自己還沒按確認時，先不顯示角色/動機/秘密/關係
+  const rolesRevealed = !game || game.phase !== "roles" || !!(game.phaseConfirm||{})[state.memberId] || PHASES.indexOf(game.phase) > PHASES.indexOf("roles");
+
+  const section = (key, title, body, open)=>
+    `<details class="collapse-block" data-keep="cl_${key}"${open?" open":""}>
+       <summary><span class="collapse-title">${title}</span></summary>
+       <div class="collapse-body">${body}</div>
+     </details>`;
+
+  let html = `<div class="charlog-box">`;
+
+  if(posterIdx){
+    html += section("poster", "愛麗絲的失蹤海報", `<div style="padding:12px 0 4px;">${renderPosterCard(posterIdx)}</div>`, false);
   }
 
-  // 地點：欄位預填認領者寫的細節，玩家仍可自行編輯（編輯後以自己的版本為準）
-  const locClaims = game.locationClaims || {};
-  html += `<div class="charlog-sub">地點（可自行編輯）</div>`;
-  LOCATION_LIST.forEach((loc,i)=>{
-    const code = LOCATION_CARDS[i];
-    const claim = code ? locClaims[code] : null;
-    // 自己編輯過就用自己的，沒編輯過就帶入該卡認領者寫的細節
-    const saved = (data.locNotes||{})[i];
-    const value = (saved !== undefined && saved !== "") ? saved : (claim ? (claim.note||"") : "");
-    const ownerTag = claim ? `（${escapeHtml((state.members[claim.owner]||{}).name||"")}）` : "";
-    html += `<div class="charlog-item">
-      <div class="iname">${loc}${ownerTag}</div>
-      <textarea data-clloc="${i}" placeholder="細節…">${escapeHtml(value)}</textarea></div>`;
-  });
+  if(!rolesRevealed){
+    html += `<div class="charlog-lock" style="padding:24px 10px;">🔒 請到「遊戲」頁籤完成角色、動機、秘密與關係分配，按下一步後這裡才會顯示。</div></div>`;
+    mount.innerHTML = html;
+    restorePhaseFormState(mount, st);
+    return;
+  }
 
-  // 嫌犯：同樣預填認領者寫的細節，可自行編輯
-  const susClaims = game.suspectClaims || {};
-  html += `<div class="charlog-sub">嫌犯（可自行編輯）</div>`;
-  PEOPLE_LIST.forEach((p,i)=>{
-    const code = SUSPECT_CARDS[i];
-    const claim = code ? susClaims[code] : null;
-    const saved = (data.peopleNotes||{})[i];
-    const value = (saved !== undefined && saved !== "") ? saved : (claim ? (claim.note||"") : "");
-    const ownerTag = claim ? `（${escapeHtml((state.members[claim.owner]||{}).name||"")}）` : "";
-    html += `<div class="charlog-item">
-      <div class="iname">${p}${ownerTag}</div>
-      <textarea data-clppl="${i}" placeholder="細節…">${escapeHtml(value)}</textarea></div>`;
-  });
+  // 角色與動機
+  let rm = `<div class="slot-row">`;
+  rm += roleCode
+    ? `<div class="card-slot large"><img src="${cardImg(roleCode,'face')}"><div class="cap ${ROLE_CSS_CLASS[roleCode]}" style="font-weight:700;">${ROLE_NAMES[roleCode]}</div></div>`
+    : `<div class="card-slot large placeholder">?</div>`;
+  rm += motiveCode
+    ? `<div class="card-slot large"><img src="${cardImg(motiveCode,'face')}"></div>`
+    : `<div class="card-slot large placeholder">?</div>`;
+  rm += `</div>`;
+  html += section("role", "角色與動機", rm, true);
+
+  // 秘密
+  html += section("secret", "我的秘密",
+    `<textarea id="cl_secret" data-clfield="secret" placeholder="寫下你的秘密…">${escapeHtml(data.secret||"")}</textarea>`, true);
+
+  // 關係（先在遊戲步驟生成，這裡帶入，之後都可以自己改）
+  const rels = getRelationItems();
+  const relBody = rels.length
+    ? rels.map(it=>`<div class="charlog-item"><div class="iname">與 ${escapeHtml(it.other)}</div>
+        <textarea id="cl_rel_${it.key}" data-clrel="${it.key}">${escapeHtml(pickNote((data.relNotes||{})[it.key], it.text))}</textarea></div>`).join("")
+    : `<div class="charlog-lock">目前還沒有關係內容</div>`;
+  html += section("rel", "關係", relBody, true);
+
+  // 地點
+  const locClaims = (game && game.locationClaims) || {};
+  const locBody = LOCATION_LIST.map((name,i)=>{
+    const claim = locClaims[LOCATION_CARDS[i]];
+    const owner = claim ? `（${escapeHtml((state.members[claim.owner]||{}).name||"")}）` : "";
+    return `<div class="charlog-item"><div class="iname">${escapeHtml(name)}${owner}</div>
+      <textarea id="cl_loc_${i}" data-clloc="${i}" placeholder="細節…">${escapeHtml(pickNote((data.locNotes||{})[i], claim ? claim.note : ""))}</textarea></div>`;
+  }).join("");
+  html += section("loc", "地點", locBody, false);
+
+  // 嫌犯
+  const susClaims = (game && game.suspectClaims) || {};
+  const susBody = PEOPLE_LIST.map((name,i)=>{
+    const claim = susClaims[SUSPECT_CARDS[i]];
+    const owner = claim ? `（${escapeHtml((state.members[claim.owner]||{}).name||"")}）` : "";
+    return `<div class="charlog-item"><div class="iname">${escapeHtml(name)}${owner}</div>
+      <textarea id="cl_sus_${i}" data-clppl="${i}" placeholder="細節…">${escapeHtml(pickNote((data.peopleNotes||{})[i], claim ? claim.note : ""))}</textarea></div>`;
+  }).join("");
+  html += section("sus", "嫌犯", susBody, false);
+
+  // 筆記（可以自己新增很多欄）
+  const notes = (data.extraNotes && data.extraNotes.length) ? data.extraNotes : [""];
+  const noteBody = notes.map((t,i)=>`<div class="charlog-item">
+      ${notes.length>1 ? `<button class="note-del" data-delnote="${i}">刪除</button>` : ""}
+      <div class="iname">筆記 ${i+1}</div>
+      <textarea id="cl_note_${i}" data-clnote="${i}" placeholder="想記什麼都可以…">${escapeHtml(t)}</textarea></div>`).join("")
+    + `<div class="note-add-row"><button class="small-btn" id="cl_add_note">＋ 新增筆記欄</button></div>`;
+  html += section("notes", "筆記", noteBody, true);
 
   html += `</div>`;
   mount.innerHTML = html;
 
-  mount.querySelector('[data-clfield="secret"]').addEventListener("input", e=>{
-    const d = loadCharLogData(); d.secret = e.target.value; saveCharLogData(d);
-  });
-  mount.querySelectorAll("[data-clloc]").forEach(el=>{
-    el.addEventListener("input", ()=>{
-      const d = loadCharLogData(); d.locNotes = d.locNotes||{};
-      d.locNotes[el.dataset.clloc] = el.value; saveCharLogData(d);
+  const save = fn=>{ const d = loadCharLogData(); fn(d); saveCharLogData(d); };
+  mount.querySelector('[data-clfield="secret"]').addEventListener("input", e=> save(d=>{ d.secret = e.target.value; }));
+  mount.querySelectorAll("[data-clrel]").forEach(el=> el.addEventListener("input", ()=> save(d=>{
+    d.relNotes = d.relNotes||{}; d.relNotes[el.dataset.clrel] = el.value; })));
+  mount.querySelectorAll("[data-clloc]").forEach(el=> el.addEventListener("input", ()=> save(d=>{
+    d.locNotes = d.locNotes||{}; d.locNotes[el.dataset.clloc] = el.value; })));
+  mount.querySelectorAll("[data-clppl]").forEach(el=> el.addEventListener("input", ()=> save(d=>{
+    d.peopleNotes = d.peopleNotes||{}; d.peopleNotes[el.dataset.clppl] = el.value; })));
+  mount.querySelectorAll("[data-clnote]").forEach(el=> el.addEventListener("input", ()=> save(d=>{
+    d.extraNotes = (d.extraNotes && d.extraNotes.length) ? d.extraNotes : [""];
+    d.extraNotes[Number(el.dataset.clnote)] = el.value; })));
+  mount.querySelectorAll("[data-delnote]").forEach(btn=> btn.addEventListener("click", ()=>{
+    save(d=>{
+      d.extraNotes = (d.extraNotes && d.extraNotes.length) ? d.extraNotes : [""];
+      d.extraNotes.splice(Number(btn.dataset.delnote), 1);
+      if(!d.extraNotes.length) d.extraNotes = [""];
     });
-  });
-  mount.querySelectorAll("[data-clppl]").forEach(el=>{
-    el.addEventListener("input", ()=>{
-      const d = loadCharLogData(); d.peopleNotes = d.peopleNotes||{};
-      d.peopleNotes[el.dataset.clppl] = el.value; saveCharLogData(d);
+    mountCharLog(mount, roleCode, true);
+  }));
+  const addBtn = mount.querySelector("#cl_add_note");
+  if(addBtn) addBtn.addEventListener("click", ()=>{
+    save(d=>{
+      d.extraNotes = (d.extraNotes && d.extraNotes.length) ? d.extraNotes : [""];
+      d.extraNotes.push("");
     });
+    mountCharLog(mount, roleCode, true);
   });
+
+  restorePhaseFormState(mount, st);
 }
 
-let dueInterval = null;
 function startDueChecker(){
   stopDueChecker();
   dueInterval = setInterval(checkDue, 1000);
