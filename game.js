@@ -102,6 +102,21 @@ const SHARED_POOLS = {
 
 const FINAL_POOL = ["S12-4","S12-5","S12-6"];
 
+// 各時間卡抽到後要做的揭曉動作（依卡面文字整理）
+//   suspect=揭曉一張嫌犯卡、location=揭曉一張地點卡、
+//   culprit=從已翻開的嫌犯中隨機選一張為真兇（30分鐘）、alicelocation=從已翻開的地點中隨機選一張為愛麗絲的位置（20分鐘）
+const SLOT_CARD_ACTION = {
+  "S08-1":"suspect","S08-2":"suspect","S08-3":"suspect",
+  "S08-4":"location","S08-5":"location","S08-6":"location",
+  "S09-1":"suspect","S09-2":"suspect","S09-3":"suspect",
+  "S09-4":"location","S09-5":"location","S09-6":"location",
+  "S10-1":"location","S10-2":"location","S10-3":"suspect",
+  "S10-4":"suspect","S10-5":"suspect","S10-6":"suspect",
+  "S11-1":"location","S11-2":"location","S11-3":"location",
+  "S11-4":"culprit","S11-5":"culprit","S11-6":"culprit",
+  "S12-1":"alicelocation","S12-2":"alicelocation","S12-3":"alicelocation",
+};
+
 const POSTER_STATS = {
   1: {height:'165.1',weight:'50.8',hair:'黑色',eye:'淡褐色'},
   2: {height:'167.6',weight:'54.4',hair:'黑色',eye:'棕色'},
@@ -544,6 +559,7 @@ function renderPhaseActionInner(){
       } else {
         html += `<div class="charlog-lock">🔒 等待 ${escapeHtml(ownerName)} 抽取</div>`;
       }
+      if(drawn) html += slotActionHtml(g.key, drawState, mine);
       html += `</div></details>`;
     });
     html += `</div>`;
@@ -744,48 +760,51 @@ function renderPlayerBlocks(){
   });
 }
 
-function renderConclusionSlot(code, setBy, remainMin, poolName){
-  if(!code) return `<div class="empty-mark">尚未選定</div>`;
-  const isSetter = setBy === state.memberId;
-  const canAccess = isSetter || remainMin <= 10;
-  if(!canAccess) return `<div class="empty-mark">🔒 10:00 後解鎖</div>`;
-  if(locallyRevealed[poolName]) return `<img src="${cardImg(code,'face')}">`;
-  return `<button class="small-btn" data-action="reveal-final" data-pool="${poolName}">👁 點擊查看</button>`;
+function slotActionHtml(key, ds, mine){
+  const type = SLOT_CARD_ACTION[ds.code];
+  if(!type) return "";                       // 90 分鐘卡沒有揭曉動作
+  let out = `<div class="slot-actions">`;
+  const nameMap = { suspect:"嫌犯卡", location:"地點卡" };
+  if(ds.revealed){
+    out += `<div class="slot-done">✅ ${type==="culprit" ? "真兇已揭曉" : type==="alicelocation" ? "愛麗絲的位置已揭曉" : "已揭曉一張"+nameMap[type]}（請看共用線索區）</div>`;
+  } else if(mine){
+    const label = type==="culprit" ? "🔎 揭曉真兇" : type==="alicelocation" ? "📍 揭曉愛麗絲的位置" : "揭曉一張"+nameMap[type];
+    out += `<button class="btn btn-outline" data-action="slot-reveal" data-group="${key}">${label}</button>`;
+  }
+  if(ds.clueCode){
+    out += `<div class="slot-done">✅ 已抽一張線索卡</div>`;
+  } else if(mine){
+    out += `<button class="btn btn-ghost" data-action="slot-clue" data-group="${key}">抽一張線索（選用）</button>`;
+  }
+  return out + `</div>`;
+}
+
+function renderConclusionSlot(code){
+  if(!code) return `<div class="empty-mark">尚未揭曉</div>`;
+  return `<img src="${cardImg(code,'face')}">`;
 }
 
 function renderSharedArea(){
   ["location","suspect","clue"].forEach(poolName=>{
-    const revealedObj = (game.sharedPools && game.sharedPools[poolName] && game.sharedPools[poolName].revealed) || {};
-    const codes = Object.keys(revealedObj);
+    const poolState = (game.sharedPools && game.sharedPools[poolName]) || {};
+    const codes = Object.keys(poolState.revealed || {});
     const row = $(`revealed-${poolName}`);
     if(!row) return;
     if(codes.length===0){
-      row.innerHTML = `<div class="revealed-empty">尚未抽取</div>`;
+      row.innerHTML = `<div class="revealed-empty">尚未揭曉</div>`;
       return;
     }
-    const finalCode = game.sharedPools[poolName].finalCode;
+    const finalCode = poolState.finalCode;
     row.innerHTML = codes.map(code=>{
-      let btn = "";
-      if(poolName==="suspect"){
-        const active = finalCode===code;
-        btn = `<button class="set-final-btn ${active?'active':''}" data-action="set-final" data-pool="suspect" data-code="${code}">${active?'✓ 真兇':'設為真兇'}</button>`;
-      } else if(poolName==="location"){
-        const active = finalCode===code;
-        btn = `<button class="set-final-btn ${active?'active':''}" data-action="set-final" data-pool="location" data-code="${code}">${active?'✓ 位置':'設為位置'}</button>`;
-      }
-      return `<div class="revealed-card"><img src="${cardImg(code,'face')}">${btn}</div>`;
+      let tag = "";
+      if(finalCode===code) tag = `<div class="revealed-tag">${poolName==="suspect" ? "✓ 真兇" : "✓ 愛麗絲的位置"}</div>`;
+      return `<div class="revealed-card"><img src="${cardImg(code,'face')}">${tag}</div>`;
     }).join("");
   });
 
-  // 結論欄：10:00 前只有設定者能查看，之後所有人都能點擊查看
-  const remainMinForFinal = (typeof remainingSeconds === "function") ? remainingSeconds()/60 : 999;
-  const susFinal = game.sharedPools?.suspect?.finalCode;
-  const susSetBy = game.sharedPools?.suspect?.finalSetBy;
-  const locFinal = game.sharedPools?.location?.finalCode;
-  const locSetBy = game.sharedPools?.location?.finalSetBy;
-
-  $("finalSuspectSlot").innerHTML = renderConclusionSlot(susFinal, susSetBy, remainMinForFinal, "suspect");
-  $("finalLocationSlot").innerHTML = renderConclusionSlot(locFinal, locSetBy, remainMinForFinal, "location");
+  // 結論欄：30 分鐘揭曉真兇、20 分鐘揭曉位置，揭曉後所有人都看得到
+  $("finalSuspectSlot").innerHTML = renderConclusionSlot(game.sharedPools?.suspect?.finalCode);
+  $("finalLocationSlot").innerHTML = renderConclusionSlot(game.sharedPools?.location?.finalCode);
 
   // 最終抉擇卡
   const fd = game.finalDraw || {};
@@ -801,6 +820,13 @@ function renderSharedArea(){
     if($("btnDrawFinal")) $("btnDrawFinal").disabled = false; // 保留可視但邏輯已擋重複抽取
   } else {
     resultBox.innerHTML = `<div class="revealed-empty">尚未抽取</div>`;
+    const remainMinFinal = (typeof remainingSeconds === "function") ? remainingSeconds()/60 : 999;
+    const finalBtn = $("btnDrawFinal");
+    if(finalBtn){
+      finalBtn.disabled = remainMinFinal > 10;
+      const cap = finalBtn.querySelector(".cap");
+      if(cap) cap.textContent = remainMinFinal > 10 ? "剩 10 分鐘可抽" : "抽取";
+    }
   }
 }
 
@@ -867,6 +893,9 @@ document.addEventListener("click", e=>{
   if(action === "draw-timer"){
     const groupKey = btn.dataset.group;
     const g = TIMER_GROUPS.find(x=>x.key===groupKey);
+    const slotOwner = groupKey==="S07-6" ? (game.roleAssign||{})["S07-1"] : (game.timerSlotAssign||{})[groupKey];
+    if(slotOwner !== state.memberId){ toast("這張卡由其他玩家負責抽取"); return; }
+    if(((game.timerSlotDraw||{})[groupKey]||{}).drawn){ return; }   // 已抽過，不能重抽
     const code = drawRandom(g.cards);
     if(!code){ toast("這組卡已經抽完"); return; }
     const patch = {};
@@ -888,13 +917,50 @@ document.addEventListener("click", e=>{
     update(patch);
   }
 
-  if(action === "draw-shared"){
-    const poolName = btn.dataset.pool;
-    const code = drawRandom(SHARED_POOLS[poolName]);
-    if(!code){ toast("這個牌堆已經抽完"); return; }
+  if(action === "slot-reveal" || action === "slot-clue"){
+    const key = btn.dataset.group;
+    const ds = (game.timerSlotDraw||{})[key];
+    const ownerId = key==="S07-6" ? (game.roleAssign||{})["S07-1"] : (game.timerSlotAssign||{})[key];
+    if(!ds || !ds.drawn || ownerId !== state.memberId) return;   // 只有這張時間卡的持有人、且已抽出劇情卡才能操作
     const patch = {};
-    patch[`sharedPools/${poolName}/revealed/${code}`] = true;
-    patch[`usedCards/${code}`] = true;
+
+    if(action === "slot-clue"){
+      if(ds.clueCode){ toast("這個時間點已經抽過線索了"); return; }
+      const code = drawRandom(SHARED_POOLS.clue);
+      if(!code){ toast("線索牌堆已經抽完"); return; }
+      patch[`sharedPools/clue/revealed/${code}`] = true;
+      patch[`usedCards/${code}`] = true;
+      patch[`timerSlotDraw/${key}/clueCode`] = code;
+      update(patch);
+      return;
+    }
+
+    if(ds.revealed){ toast("這個時間點已經揭曉過了"); return; }
+    const type = SLOT_CARD_ACTION[ds.code];
+    if(type === "suspect" || type === "location"){
+      const code = drawRandom(SHARED_POOLS[type]);
+      if(!code){ toast("這個牌堆已經抽完"); return; }
+      patch[`sharedPools/${type}/revealed/${code}`] = true;
+      patch[`usedCards/${code}`] = true;
+      patch[`timerSlotDraw/${key}/revealed`] = code;
+    } else if(type === "culprit" || type === "alicelocation"){
+      const pool = type === "culprit" ? "suspect" : "location";
+      const revealedCodes = Object.keys((game.sharedPools && game.sharedPools[pool] && game.sharedPools[pool].revealed) || {});
+      let code;
+      if(revealedCodes.length){
+        code = revealedCodes[Math.floor(Math.random()*revealedCodes.length)];   // 從已翻開的卡隨機選，不能自己挑
+      } else {
+        code = drawRandom(SHARED_POOLS[pool]);
+        if(!code){ toast("沒有可以選的卡"); return; }
+        patch[`sharedPools/${pool}/revealed/${code}`] = true;
+        patch[`usedCards/${code}`] = true;
+      }
+      patch[`sharedPools/${pool}/finalCode`] = code;
+      patch[`sharedPools/${pool}/finalSetBy`] = state.memberId;
+      patch[`timerSlotDraw/${key}/revealed`] = code;
+    } else {
+      return;
+    }
     update(patch);
   }
 
@@ -919,20 +985,6 @@ document.addEventListener("click", e=>{
     update({ playbackIndex: idx+1 });
   }
 
-  if(action === "reveal-final"){
-    const pool = btn.dataset.pool;
-    locallyRevealed[pool] = true;
-    renderSharedArea();
-  }
-
-  if(action === "set-final"){
-    const pool = btn.dataset.pool, code = btn.dataset.code;
-    const patch = {};
-    patch[`sharedPools/${pool}/finalCode`] = code;
-    patch[`sharedPools/${pool}/finalSetBy`] = state.memberId;
-    update(patch);
-  }
-
   if(action === "poster-prev" || action === "poster-next"){
     if(game.posterPickerId !== state.memberId) return;
     let idx = game.posterIndex||0;
@@ -948,6 +1000,8 @@ document.addEventListener("click", e=>{
 
   if(action === "draw-final"){
     if(game.finalDraw && game.finalDraw.code) return; // 已抽過
+    const remainMinFinal = (typeof remainingSeconds === "function") ? remainingSeconds()/60 : 999;
+    if(remainMinFinal > 10){ toast("剩餘 10 分鐘時才能抽取最終抉擇"); return; }
     const code = drawRandom(FINAL_POOL);
     if(!code){ toast("已經抽完"); return; }
     const patch = {};
@@ -1473,6 +1527,7 @@ function checkDue(){
   // 所以這裡每秒都重新畫一次「現在階段」區塊，時間到了才不用重新整理就能看到可以抽卡
   if(["live","playback","end"].includes(game.phase)){
     renderPhaseAction();
+    if($("finalSuspectSlot")) renderSharedArea();
   }
 }
 

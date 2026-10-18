@@ -617,3 +617,8 @@ body.theme-dark .role-c5{ color:#e0c060; }
 .claim-note{ font-size:14px; line-height:1.7; color:var(--ink); white-space:pre-wrap; background:var(--accent-soft); border-radius:10px; padding:12px 14px; }
 .note-add-row{ display:flex; gap:10px; margin-top:12px; }
 .note-del{ float:right; background:none; border:none; color:var(--ink-soft); font-size:12px; cursor:pointer; padding:0; }
+
+/* 時間卡綁定的揭曉／線索動作 */
+.slot-actions{ margin-top:16px; display:flex; flex-direction:column; gap:10px; }
+.slot-done{ font-size:13px; color:var(--accent-dark); }
+.revealed-tag{ margin-top:6px; font-size:13px; font-weight:800; color:var(--accent-dark); }
