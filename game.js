@@ -766,9 +766,9 @@ function slotActionHtml(key, ds, mine){
   let out = `<div class="slot-actions">`;
   const nameMap = { suspect:"嫌犯卡", location:"地點卡" };
   if(ds.revealed){
-    out += `<div class="slot-done">✅ ${type==="culprit" ? "真兇已揭曉" : type==="alicelocation" ? "愛麗絲的位置已揭曉" : "已揭曉一張"+nameMap[type]}（請看共用線索區）</div>`;
+    out += `<div class="slot-done">✅ ${type==="culprit" ? "已抽出真兇（最後 10 分鐘才會揭曉）" : type==="alicelocation" ? "已抽出愛麗絲的位置（最後 10 分鐘才會揭曉）" : "已揭曉一張"+nameMap[type]+"（請看共用線索區）"}</div>`;
   } else if(mine){
-    const label = type==="culprit" ? "🔎 揭曉真兇" : type==="alicelocation" ? "📍 揭曉愛麗絲的位置" : "揭曉一張"+nameMap[type];
+    const label = type==="culprit" ? "🔎 抽出真兇" : type==="alicelocation" ? "📍 抽出愛麗絲的位置" : "揭曉一張"+nameMap[type];
     out += `<button class="btn btn-outline" data-action="slot-reveal" data-group="${key}">${label}</button>`;
   }
   if(ds.clueCode){
@@ -779,12 +779,19 @@ function slotActionHtml(key, ds, mine){
   return out + `</div>`;
 }
 
-function renderConclusionSlot(code){
+function finalAccess(setBy, remainMin){
+  // 抽出這張的人隨時可以看；其他人要等剩餘 10 分鐘
+  return setBy === state.memberId || remainMin <= 10;
+}
+function renderConclusionSlot(code, setBy, remainMin, poolName){
   if(!code) return `<div class="empty-mark">尚未揭曉</div>`;
-  return `<img src="${cardImg(code,'face')}">`;
+  if(!finalAccess(setBy, remainMin)) return `<div class="empty-mark">🔒 最後 10 分鐘揭曉</div>`;
+  if(locallyRevealed[poolName]) return `<img src="${cardImg(code,'face')}">`;
+  return `<button class="small-btn" data-action="reveal-final" data-pool="${poolName}">👁 點擊查看</button>`;
 }
 
 function renderSharedArea(){
+  const remainMinForFinal = (typeof remainingSeconds === "function") ? remainingSeconds()/60 : 999;
   ["location","suspect","clue"].forEach(poolName=>{
     const poolState = (game.sharedPools && game.sharedPools[poolName]) || {};
     const codes = Object.keys(poolState.revealed || {});
@@ -797,14 +804,19 @@ function renderSharedArea(){
     const finalCode = poolState.finalCode;
     row.innerHTML = codes.map(code=>{
       let tag = "";
-      if(finalCode===code) tag = `<div class="revealed-tag">${poolName==="suspect" ? "✓ 真兇" : "✓ 愛麗絲的位置"}</div>`;
+      // 標籤只在有權限看答案的人畫面上出現，否則 30 分鐘就洩漏了
+      if(finalCode===code && finalAccess(poolState.finalSetBy, remainMinForFinal)){
+        tag = `<div class="revealed-tag">${poolName==="suspect" ? "✓ 真兇" : "✓ 愛麗絲的位置"}</div>`;
+      }
       return `<div class="revealed-card"><img src="${cardImg(code,'face')}">${tag}</div>`;
     }).join("");
   });
 
-  // 結論欄：30 分鐘揭曉真兇、20 分鐘揭曉位置，揭曉後所有人都看得到
-  $("finalSuspectSlot").innerHTML = renderConclusionSlot(game.sharedPools?.suspect?.finalCode);
-  $("finalLocationSlot").innerHTML = renderConclusionSlot(game.sharedPools?.location?.finalCode);
+  // 結論欄：30 分鐘抽出真兇、20 分鐘抽出位置，但要到最後 10 分鐘才對所有人揭曉
+  const susFinalState = (game.sharedPools && game.sharedPools.suspect) || {};
+  const locFinalState = (game.sharedPools && game.sharedPools.location) || {};
+  $("finalSuspectSlot").innerHTML = renderConclusionSlot(susFinalState.finalCode, susFinalState.finalSetBy, remainMinForFinal, "suspect");
+  $("finalLocationSlot").innerHTML = renderConclusionSlot(locFinalState.finalCode, locFinalState.finalSetBy, remainMinForFinal, "location");
 
   // 最終抉擇卡
   const fd = game.finalDraw || {};
@@ -915,6 +927,11 @@ document.addEventListener("click", e=>{
     patch[`usedCards/${code}`] = true;
     if(code === "S10-2"){ patch.theme = "dark"; }
     update(patch);
+  }
+
+  if(action === "reveal-final"){
+    locallyRevealed[btn.dataset.pool] = true;   // 只有自己這台裝置顯示，不同步給別人
+    renderSharedArea();
   }
 
   if(action === "slot-reveal" || action === "slot-clue"){
