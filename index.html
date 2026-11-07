@@ -90,7 +90,6 @@
       <!-- 配樂：外部連結，玩家自行決定要不要聽（用自己的 Spotify 帳號開啟） -->
       <div class="card" id="musicLinkCard">
         <h2><span class="num">♪</span>官方配樂</h2>
-        <p class="help-text" style="margin-top:0;">想要配樂的話，可以用自己的 Spotify 開啟歌單（會開在 Spotify App 或新分頁，不影響遊戲）。</p>
         <a class="btn btn-outline" href="https://open.spotify.com/playlist/71Qpjf8iYioDNqwWCBzRgr" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">在 Spotify 開啟歌單</a>
       </div>
 
@@ -142,7 +141,7 @@
           <h2 style="font-size:15px;margin:0 0 4px;color:var(--ink);">共用線索區</h2>
 
           <details class="collapse-block" data-keep="shared_location">
-            <summary><span class="collapse-title">📍 地點</span></summary>
+            <summary><span class="collapse-title">地點</span></summary>
             <div class="collapse-body">
               <div class="shared-pool" data-pool="location">
                 <div class="shared-pool-main">
@@ -153,7 +152,7 @@
           </details>
 
           <details class="collapse-block" data-keep="shared_suspect">
-            <summary><span class="collapse-title">🕵️ 嫌犯</span></summary>
+            <summary><span class="collapse-title">嫌犯</span></summary>
             <div class="collapse-body">
               <div class="shared-pool" data-pool="suspect">
                 <div class="shared-pool-main">
@@ -164,7 +163,7 @@
           </details>
 
           <details class="collapse-block" data-keep="shared_clue">
-            <summary><span class="collapse-title">🔍 線索</span></summary>
+            <summary><span class="collapse-title">線索</span></summary>
             <div class="collapse-body">
               <div class="shared-pool" data-pool="clue">
                 <div class="shared-pool-main">
@@ -190,21 +189,6 @@
             </div>
           </details>
 
-          <details class="collapse-block" data-keep="shared_final">
-            <summary><span class="collapse-title">🎲 最終抉擇</span></summary>
-            <div class="collapse-body">
-              <div class="shared-pool">
-                <div class="shared-pool-main">
-                  <button class="deck-pile" id="btnDrawFinal" data-action="draw-final">
-                    <img src="assets/cards/S12-4_back.jpg" alt="最終抉擇">
-                    <div class="cap">抽取</div>
-                  </button>
-                  <div id="finalDrawResult" style="width:100%;"></div>
-                </div>
-              </div>
-            </div>
-          </details>
-
           <div class="finale-wrap" id="finaleWrap" style="display:none;">
             <div class="cap" style="margin-bottom:6px;">錄音已播畢：</div>
             <img id="finaleCardImg" src="assets/cards/S01-2_face.jpg" alt="結局卡">
@@ -213,7 +197,6 @@
         </div>
 
         <!-- ④ 每位玩家自己的紀錄：角色、動機、角色紀錄表 -->
-        <div id="playerBlocks"></div>
 
       </div>
 
@@ -229,7 +212,7 @@
 
     <div id="msgContent" style="display:none; flex:1; min-height:0; display:none; flex-direction:column; position:relative;">
       <div class="chat-header">
-        <button class="hamburger-btn" id="btnChannelMenu" title="切換頻道">☰</button>
+        <button class="hamburger-btn" id="btnChannelMenu" title="切換頻道">☰<span class="menu-badge" id="menuBadge" style="display:none;"></span></button>
         <div class="current-channel-label" id="currentChannelName">群組</div>
         <div class="util-icons">
           <button class="icon-btn ooc-btn" id="btnOoc" title="場外討論">🗯 場外</button>
@@ -277,11 +260,11 @@
 
   <!-- ============ 說明 TAB ============ -->
   <div class="view" id="view-info">
-    <div style="flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; background:#f4f6f5;">
+    <div class="view-scroll">
       <div class="settings-scroll">
-        <div class="card">
-          <h2>📖 遊戲說明</h2>
-          <p class="help-text" style="margin-top:0; line-height:1.9;">
+        <details class="collapse-block" data-keep="info_rules">
+          <summary><span class="collapse-title">遊戲說明</span></summary>
+          <div class="collapse-body"><p class="help-text" style="margin-top:12px; line-height:1.9;">
             ◆ 今天是週六，寒假的第一天。除了查理以外，所有人開始遊戲時都知道愛麗絲最後一次露面是在週三，也就是 3 天前。<br><br>
             ◆ 玩家可以使用括號（像這樣）或場外頻道在遊戲中進行任何場外的溝通。<br><br>
             ◆ 如果有人說了你想要從遊戲中移除的內容，你可以用場外方式回覆「X」或「X：內容」來表示該內容已被使用 X-Card 移除。<br><br>
@@ -295,19 +278,18 @@
             ◆ 將你揭曉的嫌疑犯與地點卡面朝上放在各自的牌堆旁。<br><br>
             ◆ 如果出於任何原因你的角色受傷或死亡，導致無法在剩餘時間內傳簡訊，你可以使用直接私訊，向任何前往你所在地點的人提供關於他們發現你時的狀態資訊。如果這種情況發生，觸發該事件的卡片會告訴你該怎麼做。<br><br>
             ◆ 當計時器到達 00:00 時，玩家可以在遊戲結束前寫下最後一則角色身份的訊息。
-          </p>
-        </div>
-
-        <div class="card">
-          <h2>🖱 操作說明</h2>
-          <p class="help-text" style="margin-top:0; line-height:1.8;">
-            ・「遊戲」頁籤：依序進行開場、選海報、選角色與動機、分配劇情卡、錄音、正式計時等步驟，每個階段都要所有玩家各自按「下一步」確認，全員按完才會自動進入下一階段。<br>
-            ・「訊息」頁籤：左上角選單可切換群組／私訊頻道，右上角「場外」用於角色扮演之外的討論，不受計時限制。<br>
-            ・「紀錄」頁籤：只有你自己看得到，記錄你的角色、動機、秘密與線索筆記，可隨時編輯、隨時匯出。<br>
-            ・「設定」頁籤：建立或加入房間、查看成員、播放配樂。<br>
-            ・計時歸零、播放完錄音後，「遊戲」頁籤底部會出現「匯出所有場內對話紀錄」，可以下載保存整場對話。
-          </p>
-        </div>
+          </p></div>
+        </details>
+        <details class="collapse-block" data-keep="info_ops">
+          <summary><span class="collapse-title">操作說明</span></summary>
+          <div class="collapse-body"><p class="help-text" style="margin-top:12px; line-height:1.8;">
+            ・<b>「遊戲」</b>：依序進行開場、選海報、選角色與動機、分配劇情卡、錄音、正式計時等步驟，每個階段都要所有玩家各自按「下一步」確認，全員按完才會自動進入下一階段。<br>
+            ・<b>「訊息」</b>：左上角選單可切換群組／私訊頻道，右上角「場外」用於角色扮演之外的討論，不受計時限制。<br>
+            ・<b>「紀錄」</b>：只有你自己看得到，記錄你的角色、動機、秘密與線索筆記，可隨時編輯、隨時匯出。<br>
+            ・<b>「設定」</b>：建立或加入房間、查看成員、播放配樂。<br>
+            ・計時歸零、播放完錄音後，<b>「遊戲」</b>底部會出現「匯出所有場內對話紀錄」，可以下載保存整場對話。
+          </p></div>
+        </details>
       </div>
     </div>
   </div>
@@ -319,6 +301,11 @@
       <!-- 房間資訊會在加入房間後從登入畫面搬移到這裡 -->
       <div id="roomCardMount"></div>
 
+      <div class="card">
+        <h2>官方配樂</h2>
+        <a class="btn btn-outline" href="https://open.spotify.com/playlist/71Qpjf8iYioDNqwWCBzRgr" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">在 Spotify 開啟歌單</a>
+      </div>
+
     </div>
   </div>
 
@@ -328,7 +315,7 @@
       <span class="icon">🂠</span><span>遊戲</span>
     </button>
     <button class="tabbtn" data-tab="messages">
-      <span class="icon">✉</span><span>訊息</span>
+      <span class="icon">✉</span><span>訊息</span><span class="tab-badge" id="msgTabBadge" style="display:none;"></span>
     </button>
     <button class="tabbtn" data-tab="charlog">
       <span class="icon">✎</span><span>紀錄</span>

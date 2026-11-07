@@ -317,9 +317,14 @@ function attachMembers(){
     state.members = snap.val() || {};
     renderMembers();
     renderChannelStrip();
+    syncUnreadListeners();
     updateAvatarPreview();
     if(window.GameModule) window.GameModule.onMembersChanged();
   });
+}
+function memberRoleSuffix(id){
+  const rn = (window.GameModule && window.GameModule.getDisplayName) ? window.GameModule.getDisplayName(id) : null;
+  return rn ? `（${escapeHtml(rn)}）` : "";
 }
 function avatarInnerHtml(id){
   const m = state.members[id] || {};
@@ -340,7 +345,7 @@ function renderMembers(){
     row.className = "member-row";
     row.innerHTML = `
       <div class="avatar" style="background:${colorFor(id)}">${avatarInnerHtml(id)}</div>
-      <div class="name">${escapeHtml(m.name||"未命名")}</div>
+      <div class="name">${escapeHtml(m.name||"未命名")}${memberRoleSuffix(id)}</div>
       ${id===state.memberId ? '<span class="you-tag">你</span>' : ''}
     `;
     list.appendChild(row);
@@ -373,8 +378,10 @@ function renderChannelStrip(){
 }
 function makeChannelItem(key, label, prefix){
   const item = document.createElement("div");
-  item.className = "channel-item" + (state.currentChannel===key ? " active":"");
-  item.innerHTML = `<span class="hash">${prefix}</span> ${escapeHtml(label)}`;
+  const n = (state.unread || {})[key] || 0;
+  item.className = "channel-item" + (state.currentChannel===key ? " active":"") + (n ? " unread" : "");
+  item.innerHTML = `<span class="hash">${prefix}</span> ${escapeHtml(label)}` +
+    (n ? `<span class="unread-count">${n>99?"99+":n}</span>` : "");
   item.addEventListener("click", ()=>{
     switchChannel(key);
     closeChannelDrawer();
@@ -413,6 +420,7 @@ function switchChannel(key){
   }
   attachMessages(key);
   updateComposerLock();
+  markCurrentSeenIfViewing();
 }
 
 function channelPath(key){
@@ -682,6 +690,59 @@ window.exportInSceneLog = async function(){
   }
 };
 
+/* ---------- 未讀訊息：紅色數字＋粗體 ---------- */
+const BASE_TITLE = document.title;
+let unreadRefs = {};
+function seenStoreKey(){ return `seen_${state.roomId}_${state.memberId}`; }
+function loadSeen(){ try{ return JSON.parse(localStorage.getItem(seenStoreKey())) || {}; }catch(e){ return {}; } }
+function saveSeen(o){ try{ localStorage.setItem(seenStoreKey(), JSON.stringify(o)); }catch(e){} }
+function isViewingChannel(key){
+  const v = $("view-messages");
+  return state.currentChannel === key && v && v.classList.contains("active") && !document.hidden;
+}
+function markChannelSeen(key){
+  const ts = (state.lastTs || {})[key] || 0;
+  const seen = loadSeen();
+  if((seen[key]||0) < ts){ seen[key] = ts; saveSeen(seen); }
+  if(state.unread && state.unread[key]) state.unread[key] = 0;
+  refreshUnreadUI();
+}
+function markCurrentSeenIfViewing(){
+  if(state.roomId && state.currentChannel && isViewingChannel(state.currentChannel)) markChannelSeen(state.currentChannel);
+}
+function refreshUnreadUI(){
+  const total = Object.values(state.unread || {}).reduce((x,y)=>x+y, 0);
+  const label = total > 99 ? "99+" : String(total);
+  const tab = $("msgTabBadge"), menu = $("menuBadge");
+  if(tab){ tab.style.display = total ? "" : "none"; tab.textContent = label; }
+  if(menu){ menu.style.display = total ? "" : "none"; menu.textContent = label; }
+  document.title = (total ? `(${label}) ` : "") + BASE_TITLE;
+  renderChannelStrip();
+}
+function syncUnreadListeners(){
+  if(!state.roomId || !state.memberId || !db) return;
+  state.unread = state.unread || {}; state.lastTs = state.lastTs || {};
+  const keys = ["group", "ooc", ...Object.keys(state.members).filter(id=>id!==state.memberId)];
+  keys.forEach(key=>{
+    if(unreadRefs[key]) return;
+    const ref = db.ref(channelPath(key)).limitToLast(100);
+    ref.on("child_added", snap=>{
+      const m = snap.val(); if(!m) return;
+      const ts = m.ts || 0;
+      state.lastTs[key] = Math.max(state.lastTs[key] || 0, ts);
+      if(m.sender === state.memberId) return;
+      if(isViewingChannel(key)){ markChannelSeen(key); return; }
+      if(ts > (loadSeen()[key] || 0)){ state.unread[key] = (state.unread[key] || 0) + 1; refreshUnreadUI(); }
+    });
+    unreadRefs[key] = ref;
+  });
+}
+function detachUnread(){
+  Object.values(unreadRefs).forEach(r=>{ try{ r.off("child_added"); }catch(e){} });
+  unreadRefs = {}; state.unread = {}; state.lastTs = {};
+  document.title = BASE_TITLE;
+}
+
 /* ---------- Tab switching ---------- */
 document.querySelectorAll(".tabbtn").forEach(btn=>{
   btn.addEventListener("click", ()=>{
@@ -689,11 +750,14 @@ document.querySelectorAll(".tabbtn").forEach(btn=>{
     document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
     btn.classList.add("active");
     $("view-"+btn.dataset.tab).classList.add("active");
+    setTimeout(markCurrentSeenIfViewing, 0);
   });
 });
+document.addEventListener("visibilitychange", markCurrentSeenIfViewing);
 
 /* ---------- Cleanup ---------- */
 function detachAll(){
+  detachUnread();
   if(membersRef) membersRef.off();
   if(timerRef) timerRef.off();
   if(activeMsgRef && activeMsgHandler) activeMsgRef.off("value", activeMsgHandler);
